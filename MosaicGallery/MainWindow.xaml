@@ -25,6 +25,16 @@
                         <TextBlock TextWrapping="Wrap" Text="Group spacing" Width="91"/>
                         <TextBox x:Name="group_spacing_num" TextWrapping="Wrap" Text="50" Width="100" PreviewTextInput="group_spacing_num_PreviewTextInput" />
                     </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="209,57,8,145">
+                        <TextBlock TextWrapping="Wrap" Text="Order by" Width="53" Height="16"/>
+                        <ComboBox x:Name="orderType" Width="130" SelectedIndex="0">
+                            <ComboBoxItem Content="Creation time"/>
+                            <ComboBoxItem Content="Name"/>
+                            <ComboBoxItem Content="Random"/>
+                            <ComboBoxItem Content="Creation time [ASC]"/>
+                            <ComboBoxItem Content="Name [ASC]"/>
+                        </ComboBox>
+                    </StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="10,79,10,128">
                         <TextBlock TextWrapping="Wrap" Text="Seed" Width="91"/>
                         <TextBox x:Name="seed_num" TextWrapping="Wrap" Text="0" Width="100" PreviewTextInput="seed_num_PreviewTextInput"/>
@@ -53,17 +63,18 @@
         </Grid>
         <ScrollViewer x:Name="scrollViewer" ScrollChanged="scrollViewer_ScrollChanged" PreviewMouseWheel="scrollViewer_PreviewMouseWheel_1" >
             <Grid x:Name="scrollGrid" SizeChanged="scrollGrid_SizeChanged" PreviewMouseLeftButtonDown="grid_PreviewMouseLeftButtonDown" PreviewMouseMove="grid_PreviewMouseMove" PreviewMouseLeftButtonUp="grid_PreviewMouseLeftButtonUp">
-                <Grid.ContextMenu>
-                    <ContextMenu Name="cm">
-                        <MenuItem Header="Выбрать папку.." Click="OpenMenu_Click"/>
-                    </ContextMenu>
-                </Grid.ContextMenu>
             </Grid>
             <ScrollViewer.ContextMenu>
                 <ContextMenu Name="cm2">
-                    <MenuItem Header="Выбрать папку.." Click="OpenMenu_Click"/>
+                    <MenuItem Header="Select folder.." Click="OpenMenu_Click"/>
                 </ContextMenu>
             </ScrollViewer.ContextMenu>
         </ScrollViewer>
+        <Grid x:Name="bigImageContainer" Visibility="Collapsed" MouseLeftButtonDown="bigImageContainer_MouseLeftButtonDown" MouseRightButtonDown="bigImageContainer_MouseRightButtonDown">
+            <Grid.Background>
+                <SolidColorBrush Color="#FF003761"/>
+            </Grid.Background>
+            <Image x:Name="bigImage" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" Stretch="Uniform"/>
+        </Grid>
     </Grid>
 </Window>

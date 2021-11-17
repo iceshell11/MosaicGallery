@@ -9,12 +9,15 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using MosaicGallery.Model;
+using System.Windows.Input;
 
 namespace MosaicGallery
 {
     public class ImagePlacer
     {
         public string Path;
+        public string[] Extentions = new string[] { ".jpeg", ".jpg", ".png", ".bmp" };
+
         public SearchOption SearchOption;
         public int Seed;
         public int GroupSpace;
@@ -32,6 +35,10 @@ namespace MosaicGallery
         private static DateTime LoadTime;
         private static bool IsLoading = false;
         private Grid scrollGrid;
+
+        public MouseButtonEventHandler ImageClickHandler;
+        public ContextMenu ContextMenu;
+        public OrderType OrderType = OrderType.CreationTypeDes;
 
         public ImagePlacer(string path, Grid scrollGrid)
         {
@@ -91,10 +98,27 @@ namespace MosaicGallery
                 }
 
                 Random rand = new Random(Seed);
-                var extentions = new string[] { ".jpeg", ".jpg", ".png" };
 
-                var usorted_files = Directory.GetFiles(Path, "*", SearchOption).Where(x => extentions.Any(y => x.EndsWith(y, StringComparison.OrdinalIgnoreCase)));
-                var files = new Queue<string>(usorted_files.OrderByDescending(x => File.GetCreationTime(x).Ticks));
+                var usorted_files = Directory.GetFiles(Path, "*", SearchOption).Where(x => Extentions.Any(y => x.EndsWith(y, StringComparison.OrdinalIgnoreCase)));
+                Queue<string> files = null;
+                switch (OrderType)
+                {
+                    case OrderType.CreationTypeDes:
+                        files = new Queue<string>(usorted_files.OrderByDescending(x => System.IO.File.GetCreationTime(x).Ticks));
+                        break;
+                    case OrderType.NameDes:
+                        files = new Queue<string>(usorted_files.OrderByDescending(x => x));
+                        break;
+                    case OrderType.Random:
+                        files = new Queue<string>(usorted_files.OrderByDescending(x => rand.Next()));
+                        break;
+                    case OrderType.CreationTypeAsc:
+                        files = new Queue<string>(usorted_files.OrderBy(x => System.IO.File.GetCreationTime(x).Ticks));
+                        break;
+                    case OrderType.NameAsc:
+                        files = new Queue<string>(usorted_files.OrderBy(x => x));
+                        break;
+                }
 
                 foreach (var file in files)
                 {
@@ -144,8 +168,6 @@ namespace MosaicGallery
 
                             var bitmap = new BitmapImage();
 
-
-
                             if (visible)
                             {
                                 bitmap.BeginInit();
@@ -163,6 +185,15 @@ namespace MosaicGallery
                                 VerticalAlignment = VerticalAlignment.Center,
                                 Tag = img.Filename
                             };
+
+                            if(ImageClickHandler != null)
+                            {
+                                imgItem.PreviewMouseLeftButtonDown += ImageClickHandler;
+                            }
+                            if (ContextMenu != null)
+                            {
+                                imgItem.ContextMenu = ContextMenu;
+                            }
 
                             imgPositions.Add(new ImageUIInfo()
                             {

@@ -94,8 +94,62 @@ namespace MosaicGallery
                 SmallCount = (int)small_slider.Value,
                 MediumCount = (int)medium_slider.Value,
                 LargeCount = (int)large_slider.Value,
-                ImageLoadDelay = imageLoadDelay
+                ImageLoadDelay = imageLoadDelay,
             };
+
+            switch (orderType.SelectedIndex)
+            {
+                case 0:
+                    imPlacer.OrderType = OrderType.CreationTypeDes;
+                    break;
+                case 1:
+                    imPlacer.OrderType = OrderType.NameDes;
+                    break;
+                case 2:
+                    imPlacer.OrderType = OrderType.Random;
+                    break;
+                case 3:
+                    imPlacer.OrderType = OrderType.CreationTypeAsc;
+                    break;
+                case 4:
+                    imPlacer.OrderType = OrderType.NameAsc;
+                    break;
+            }
+
+            imPlacer.ImageClickHandler = (sender1, e1) => {
+                if(e1.ClickCount == 2)
+                {
+                    var img = sender1 as Image;
+                    bigImage.Source = img.Source;
+                    bigImageContainer.Visibility = Visibility.Visible;
+                }
+            };
+
+            {
+                imPlacer.ContextMenu = new ContextMenu();
+                var reopen_item = new MenuItem() { Header = "Select folder..." };
+                reopen_item.Click += (s1, e1) => {
+                    OpenMenu_Click(s1, e1);
+                };
+                imPlacer.ContextMenu.Items.Add(reopen_item);
+
+                var open_file = new MenuItem() { Header = "Open file" };
+                open_file.Click += (s1, e1) => {
+                    var image = ((s1 as MenuItem).Parent as ContextMenu).PlacementTarget as Image;
+                    var path = image.Tag.ToString();
+                    System.Diagnostics.Process.Start(path);
+                };
+                imPlacer.ContextMenu.Items.Add(open_file);
+
+                var reveal_menu = new MenuItem() { Header = "Reveal in explorer" };
+                reveal_menu.Click += (s1, e1) => {
+                    var image = ((s1 as MenuItem).Parent as ContextMenu).PlacementTarget as Image;
+                    var path = image.Tag.ToString();
+                    string argument = "/select, \"" + path + "\"";
+                    System.Diagnostics.Process.Start("explorer.exe", argument);
+                };
+                imPlacer.ContextMenu.Items.Add(reveal_menu);
+            }
 
             if (imPlacer.LoadImages(imgPositions, (double pos) => Math.Abs(pos - scrollContentOffset) < visabilityDistance, ()=> scrollRemain >= 1500))
             {
@@ -176,6 +230,27 @@ namespace MosaicGallery
         private void close_button_Copy_Click(object sender, RoutedEventArgs e)
         {
             load_grid.Visibility = Visibility.Collapsed;
+        }
+
+        private void RevealInFolder_Click(object sender, RoutedEventArgs e)
+        {
+            var image = sender as Image;
+            var path = image.Tag.ToString();
+            string argument = "/select, \"" + path + "\"";
+            System.Diagnostics.Process.Start("explorer.exe", argument);
+        }
+
+        private void bigImageContainer_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if(e.ClickCount == 2)
+            {
+                bigImageContainer.Visibility = Visibility.Collapsed;
+                bigImage.Source = null;
+            }
+        }
+
+        private void bigImageContainer_MouseRightButtonDown(object sender, MouseButtonEventArgs e)
+        {
         }
     }
 }
