@@ -23,7 +23,7 @@ namespace MosaicGallery
             this.scrollGrid = scrollGrid;
         }
 
-        public void StartVisabilityControl(ConcurrentBag<ImageUIInfo> imgPositions, Func<double, bool> isVisiblePred)
+        public void StartVisabilityControl(ConcurrentBag<ImageUIInfo> imgPositions, Func<double, bool> isVisiblePred, Func<bool> isScrolling)
         {
             Task.Run(async () => {
 
@@ -72,7 +72,7 @@ namespace MosaicGallery
                                 img.Visibility = item.visible ? Visibility.Visible : Visibility.Collapsed;
                             });
 
-                            await Task.Delay(ImageLoadDelay);
+                            await Task.Delay(isScrolling() ? ImageLoadDelay * 4 : ImageLoadDelay);
                         }
                     }
 
@@ -82,7 +82,7 @@ namespace MosaicGallery
                         GC.Collect();
                     }
 
-                    await Task.Delay(10);
+                    await Task.Delay(isScrolling() ? ImageLoadDelay * 4 : ImageLoadDelay);
                 }
             });
 

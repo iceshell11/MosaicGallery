@@ -46,7 +46,7 @@ namespace MosaicGallery
             this.scrollGrid = scrollGrid;
         }
 
-        public bool LoadImages(ConcurrentBag<ImageUIInfo> imgPositions, Func<double, bool> isVisiblePred, Func<bool> continueLoadingPred)
+        public bool LoadImages(ConcurrentBag<ImageUIInfo> imgPositions, Func<double, bool> isVisiblePred, Func<bool> continueLoadingPred, Func<bool> isScrolling)
         {
             if (!Directory.Exists(Path))
             {
@@ -65,8 +65,6 @@ namespace MosaicGallery
 
             Task.Run(async () =>
             {
-                List<ImageInfo> images = new List<ImageInfo>();
-
                 while (IsLoading)
                 {
                     await Task.Delay(100);
@@ -100,37 +98,58 @@ namespace MosaicGallery
                 Random rand = new Random(Seed);
 
                 var usorted_files = Directory.GetFiles(Path, "*", SearchOption).Where(x => Extentions.Any(y => x.EndsWith(y, StringComparison.OrdinalIgnoreCase)));
-                Queue<string> files = null;
+                string[] files = null;
                 switch (OrderType)
                 {
                     case OrderType.CreationTypeDes:
-                        files = new Queue<string>(usorted_files.OrderByDescending(x => System.IO.File.GetCreationTime(x).Ticks));
+                        files = usorted_files.OrderByDescending(x => System.IO.File.GetCreationTime(x).Ticks).ToArray();
                         break;
                     case OrderType.NameDes:
-                        files = new Queue<string>(usorted_files.OrderByDescending(x => x));
+                        files = usorted_files.OrderByDescending(x => x).ToArray();
                         break;
                     case OrderType.Random:
-                        files = new Queue<string>(usorted_files.OrderByDescending(x => rand.Next()));
+                        files = usorted_files.OrderByDescending(x => rand.Next()).ToArray();
                         break;
                     case OrderType.CreationTypeAsc:
-                        files = new Queue<string>(usorted_files.OrderBy(x => System.IO.File.GetCreationTime(x).Ticks));
+                        files = usorted_files.OrderBy(x => System.IO.File.GetCreationTime(x).Ticks).ToArray();
                         break;
                     case OrderType.NameAsc:
-                        files = new Queue<string>(usorted_files.OrderBy(x => x));
+                        files = usorted_files.OrderBy(x => x).ToArray();
                         break;
                 }
 
-                foreach (var file in files)
-                {
-                    var bitmap = new BitmapImage();
+                ImageInfo[] parallelRes = new ImageInfo[files.Length];
 
-                    bitmap.BeginInit();
-                    bitmap.CreateOptions = BitmapCreateOptions.IgnoreColorProfile;
-                    bitmap.StreamSource = File.OpenRead(file);
-                    bitmap.EndInit();
+                Parallel.ForEach(Partitioner.Create(0, files.Length), range => {
+                    for (var i = range.Item1; i < range.Item2; i++)
+                    {
+                        string file = files[i];
 
-                    images.Add(new ImageInfo(file, bitmap.Width > bitmap.Height ? Model.Orientation.Horizontal : Model.Orientation.Vertical));
-                }
+                        using (var stream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.Read))
+                        {
+                            var bitmapFrame = BitmapFrame.Create(stream, BitmapCreateOptions.DelayCreation, BitmapCacheOption.None);
+                            var width = bitmapFrame.PixelWidth;
+                            var height = bitmapFrame.PixelHeight;
+                            parallelRes[i] = new ImageInfo(file, width > height ? Model.Orientation.Horizontal : Model.Orientation.Vertical);
+                        }
+
+                    }
+                });
+
+                List<ImageInfo> images = new List<ImageInfo>(parallelRes);
+
+                //foreach (var file in files)
+                //{
+                //    var bitmap = new BitmapImage();
+
+                //    bitmap.BeginInit();
+                //    bitmap.CreateOptions = BitmapCreateOptions.IgnoreColorProfile;
+                //    bitmap.StreamSource = File.OpenRead(file);
+                //    bitmap.EndInit();
+
+                //    images.Add(new ImageInfo(file, bitmap.Width > bitmap.Height ? Model.Orientation.Horizontal : Model.Orientation.Vertical));
+                //}
+
                 GC.Collect();
 
                 double h = 0;
@@ -214,13 +233,14 @@ namespace MosaicGallery
                                 Tag = "Image",
                             });
                         });
-                        await Task.Delay(ImageLoadDelay);
+                        await Task.Delay(isScrolling() ? ImageLoadDelay * 4 : ImageLoadDelay);
 
                         if (taskStartTime != LoadTime)
                         {
                             break;
                         }
                     }
+
                     if (images.Any())
                     {
                         while (continueLoadingPred() && taskStartTime == LoadTime)

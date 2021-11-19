@@ -4,20 +4,10 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Runtime.Remoting.Metadata.W3cXsd2001;
-using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
 using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
-
 namespace MosaicGallery
 {
     /// <summary>
@@ -27,10 +17,11 @@ namespace MosaicGallery
     {
         private double scrollRemain = 0;
         private double scrollContentOffset = 0;
+        private long lastScrollTime = 0;
 
-        private double visabilityDistance = 2000;
+        private double visabilityDistance = 3000;
 
-        private int imageLoadDelay = 10;
+        private int imageLoadDelay = 15;
 
 
         Point scrollMousePoint = new Point();
@@ -49,7 +40,7 @@ namespace MosaicGallery
             seed_num.Text = new Random().Next(99999).ToString();
             path_textbox.Focus();
 
-            new ResourceController(scrollGrid).StartVisabilityControl(imgPositions, (double pos) => Math.Abs(pos - scrollContentOffset) < visabilityDistance);
+            new ResourceController(scrollGrid).StartVisabilityControl(imgPositions, (double pos) => Math.Abs(pos - scrollContentOffset) < visabilityDistance, () => DateTime.Now.Ticks - lastScrollTime < 1000 * TimeSpan.TicksPerMillisecond);
         }
 
         private void scrollGrid_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -67,10 +58,12 @@ namespace MosaicGallery
             }
         }
 
+
         private void scrollViewer_ScrollChanged(object sender, ScrollChangedEventArgs e)
         {
             scrollRemain = (e.ExtentHeight - e.VerticalOffset);
             scrollContentOffset = scrollViewer.ContentVerticalOffset;
+            lastScrollTime = DateTime.Now.Ticks;
         }
 
         private void ok_button_Click_1(object sender, RoutedEventArgs e)
@@ -151,7 +144,7 @@ namespace MosaicGallery
                 imPlacer.ContextMenu.Items.Add(reveal_menu);
             }
 
-            if (imPlacer.LoadImages(imgPositions, (double pos) => Math.Abs(pos - scrollContentOffset) < visabilityDistance, ()=> scrollRemain >= 1500))
+            if (imPlacer.LoadImages(imgPositions, (double pos) => Math.Abs(pos - scrollContentOffset) < visabilityDistance, ()=> scrollRemain >= 1500, () => DateTime.Now.Ticks - lastScrollTime < 1000 * TimeSpan.TicksPerMillisecond))
             {
                 scrollViewer.ScrollToVerticalOffset(0);
                 load_grid.Visibility = Visibility.Collapsed;

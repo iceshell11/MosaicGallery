@@ -10,7 +10,7 @@ namespace MosaicGallery.Model
     {
         CreationTypeDes,
         NameDes,
-        CreationTypeAsc ,
+        CreationTypeAsc,
         NameAsc,
         Random
     }
