@@ -8,6 +8,8 @@ using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
+
 namespace MosaicGallery
 {
     /// <summary>
@@ -110,11 +112,12 @@ namespace MosaicGallery
             }
 
             imPlacer.ImageClickHandler = (sender1, e1) => {
-                if(e1.ClickCount == 2)
+                // var parent = (Border)(sender1 as Image).Parent;
+                // parent.BorderBrush = new SolidColorBrush(Colors.Black);
+                if (e1.ClickCount == 2)
                 {
                     var img = sender1 as Image;
-                    bigImage.Source = img.Source;
-                    bigImageContainer.Visibility = Visibility.Visible;
+                    SetBigImage(img);
                 }
             };
 
@@ -245,5 +248,58 @@ namespace MosaicGallery
         private void bigImageContainer_MouseRightButtonDown(object sender, MouseButtonEventArgs e)
         {
         }
+
+        private void bigImageContainer_KeyDown(object sender, KeyEventArgs e)
+        {
+          
+        }
+
+
+        private void FormKeyDown(object sender, KeyEventArgs e)
+        {
+            if (bigImageContainer.Visibility == Visibility.Visible)
+            {
+                if (e.Key == Key.Left)
+                {
+                    var image = bigImageContainer.Tag as Image;
+                    if (image != null)
+                    {
+                        Border parent = (Border)image.Parent;
+                        var children = ((Grid)parent.Parent).Children;
+                        int bIndex = children.IndexOf(parent);
+                        if (bIndex > 0)
+                        {
+                            SetBigImage((Image)((Border)children[bIndex - 1]).Child);
+                        }
+                    }
+                }
+                else if(e.Key == Key.Right)
+                {
+                    var image = bigImageContainer.Tag as Image;
+                    if (image != null)
+                    {
+                        Border parent = (Border)image.Parent;
+                        var children = ((Grid)parent.Parent).Children;
+                        int bIndex = children.IndexOf(parent);
+                        if (bIndex + 1 < children.Count)
+                        {
+                            SetBigImage((Image)((Border)children[bIndex + 1]).Child);
+                        }
+                    }
+                }
+              
+            }
+        }
+
+        private void SetBigImage(Image original)
+        {
+            if (original.Source != null)
+            {
+                bigImage.Source = original.Source;
+                bigImageContainer.Visibility = Visibility.Visible;
+                bigImageContainer.Tag = original;
+            }
+        }
+
     }
 }
