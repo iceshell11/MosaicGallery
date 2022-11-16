@@ -4,11 +4,19 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows.Media;
+using System.Windows;
 
 namespace MosaicGallery
 {
     public static class Extentions
     {
+        public static T FindParent<T>(this DependencyObject child) where T : DependencyObject
+        {
+            DependencyObject parent = VisualTreeHelper.GetParent(child);
+            return parent as T ?? FindParent<T>(parent);
+        }
+
         public static T GetRandom<T>(this LinkedList<T> list, Random rand)
         {
             int r = rand.Next(list.Count);

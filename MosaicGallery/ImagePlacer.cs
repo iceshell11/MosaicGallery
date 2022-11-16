@@ -176,6 +176,8 @@ namespace MosaicGallery
 
                     foreach (BlockInfo block in mosaic.blocks)
                     {
+                        string metadata = block.Img.Filename.EndsWith(".png") ? PngMetadataReader.ReadMetadata(block.Img.Filename) : null;
+                        
                         Application.Current.Dispatcher.Invoke(() =>
                         {
                             var img = block.Img;
@@ -221,17 +223,8 @@ namespace MosaicGallery
                                 visible = visible,
                             });
 
-                            scrollGrid.Children.Add(new Border()
-                            {
-                                Child = imgItem,
-                                HorizontalAlignment = HorizontalAlignment.Left,
-                                VerticalAlignment = VerticalAlignment.Top,
-                                Margin = margin,
-                                Width = block.Size.Width * scaleX,
-                                Height = block.Size.Height * scaleY,
-                                BorderThickness = new Thickness(2, 2, 2, 2),
-                                Tag = "Image",
-                            });
+                            var imageContainer = new ImageContainer(imgItem, new Size(block.Size.Width * scaleX, block.Size.Height * scaleY), margin, metadata);
+                            scrollGrid.Children.Add(imageContainer);
                         });
                         await Task.Delay(isScrolling() ? ImageLoadDelay * 4 : ImageLoadDelay);
 

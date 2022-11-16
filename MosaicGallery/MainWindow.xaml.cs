@@ -29,8 +29,10 @@ namespace MosaicGallery
         Point scrollMousePoint = new Point();
         double hOff = 1;
 
-        private ConcurrentBag<ImageUIInfo> imgPositions = new ConcurrentBag<ImageUIInfo>();
+        private ConcurrentBag<ImageUIInfo> _imgPositions = new ConcurrentBag<ImageUIInfo>();
 
+        private SelectionProcessor _selectionProcessor = new SelectionProcessor();
+        private FileProcessor _fileProcessor = new FileProcessor();
 
         public MainWindow()
         {
@@ -42,7 +44,7 @@ namespace MosaicGallery
             seed_num.Text = new Random().Next(99999).ToString();
             path_textbox.Focus();
 
-            new ResourceController(scrollGrid).StartVisabilityControl(imgPositions, (double pos) => Math.Abs(pos - scrollContentOffset) < visabilityDistance, () => DateTime.Now.Ticks - lastScrollTime < 1000 * TimeSpan.TicksPerMillisecond);
+            new ResourceController(scrollGrid).StartVisabilityControl(_imgPositions, (double pos) => Math.Abs(pos - scrollContentOffset) < visabilityDistance, () => DateTime.Now.Ticks - lastScrollTime < 1000 * TimeSpan.TicksPerMillisecond);
         }
 
         private void scrollGrid_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -112,12 +114,20 @@ namespace MosaicGallery
             }
 
             imPlacer.ImageClickHandler = (sender1, e1) => {
-                // var parent = (Border)(sender1 as Image).Parent;
-                // parent.BorderBrush = new SolidColorBrush(Colors.Black);
-                if (e1.ClickCount == 2)
+                if (Keyboard.IsKeyDown(Key.LeftShift))
                 {
                     var img = sender1 as Image;
-                    SetBigImage(img);
+                    _selectionProcessor.ToggleSelection(img.FindParent<ImageContainer>());
+                }
+                else
+                {
+                    _selectionProcessor.ResetSelection();
+
+                    if (e1.ClickCount == 2)
+                    {
+                        var img = sender1 as Image;
+                        SetBigImage(img.FindParent<ImageContainer>());
+                    }
                 }
             };
 
@@ -145,9 +155,25 @@ namespace MosaicGallery
                     System.Diagnostics.Process.Start("explorer.exe", argument);
                 };
                 imPlacer.ContextMenu.Items.Add(reveal_menu);
+
+
+                var delete_menu = new MenuItem() { Header = "Delete" };
+                delete_menu.Click += (s1, e1) => {
+                    var image = ((s1 as MenuItem).Parent as ContextMenu).PlacementTarget as Image;
+
+                    if (_selectionProcessor.Contains(image.Parent as Border))
+                    {
+                        _fileProcessor.DeleteImages(_selectionProcessor.SelectedImages);
+                    }
+                    else
+                    {
+                        _fileProcessor.DeleteImages(image);
+                    }
+                };
+                imPlacer.ContextMenu.Items.Add(delete_menu);
             }
 
-            if (imPlacer.LoadImages(imgPositions, (double pos) => Math.Abs(pos - scrollContentOffset) < visabilityDistance, ()=> scrollRemain >= 1500, () => DateTime.Now.Ticks - lastScrollTime < 1000 * TimeSpan.TicksPerMillisecond))
+            if (imPlacer.LoadImages(_imgPositions, (double pos) => Math.Abs(pos - scrollContentOffset) < visabilityDistance, ()=> scrollRemain >= 1500, () => DateTime.Now.Ticks - lastScrollTime < 1000 * TimeSpan.TicksPerMillisecond))
             {
                 scrollViewer.ScrollToVerticalOffset(0);
                 load_grid.Visibility = Visibility.Collapsed;
@@ -248,42 +274,34 @@ namespace MosaicGallery
         private void bigImageContainer_MouseRightButtonDown(object sender, MouseButtonEventArgs e)
         {
         }
-
-        private void bigImageContainer_KeyDown(object sender, KeyEventArgs e)
-        {
-          
-        }
-
-
+        
         private void FormKeyDown(object sender, KeyEventArgs e)
         {
             if (bigImageContainer.Visibility == Visibility.Visible)
             {
                 if (e.Key == Key.Left)
                 {
-                    var image = bigImageContainer.Tag as Image;
-                    if (image != null)
+                    var imageContainer = bigImageContainer.Tag as ImageContainer;
+                    if (imageContainer?.Image != null)
                     {
-                        Border parent = (Border)image.Parent;
-                        var children = ((Grid)parent.Parent).Children;
-                        int bIndex = children.IndexOf(parent);
+                        var children = ((Grid)imageContainer.Parent).Children;
+                        int bIndex = children.IndexOf(imageContainer);
                         if (bIndex > 0)
                         {
-                            SetBigImage((Image)((Border)children[bIndex - 1]).Child);
+                            SetBigImage((ImageContainer)children[bIndex - 1]);
                         }
                     }
                 }
                 else if(e.Key == Key.Right)
                 {
-                    var image = bigImageContainer.Tag as Image;
-                    if (image != null)
+                    var imageContainer = bigImageContainer.Tag as ImageContainer;
+                    if (imageContainer?.Image != null)
                     {
-                        Border parent = (Border)image.Parent;
-                        var children = ((Grid)parent.Parent).Children;
-                        int bIndex = children.IndexOf(parent);
+                        var children = ((Grid)imageContainer.Parent).Children;
+                        int bIndex = children.IndexOf(imageContainer);
                         if (bIndex + 1 < children.Count)
                         {
-                            SetBigImage((Image)((Border)children[bIndex + 1]).Child);
+                            SetBigImage((ImageContainer)children[bIndex + 1]);
                         }
                     }
                 }
@@ -291,15 +309,18 @@ namespace MosaicGallery
             }
         }
 
-        private void SetBigImage(Image original)
+        private void SetBigImage(ImageContainer imgContainer)
         {
-            if (original.Source != null)
+            if (imgContainer.Image.Source != null)
             {
-                bigImage.Source = original.Source;
+                bigImage.Source = imgContainer.Image.Source;
                 bigImageContainer.Visibility = Visibility.Visible;
-                bigImageContainer.Tag = original;
+                bigImageContainer.Tag = imgContainer;
             }
         }
 
+        private void Grid_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+        }
     }
 }
