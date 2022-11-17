@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -37,6 +38,23 @@ namespace MosaicGallery
         public MainWindow()
         {
             InitializeComponent();
+
+            int pathIndex = Array.IndexOf(Environment.GetCommandLineArgs(), "--path");  
+
+            if (pathIndex != -1)
+            {
+                var arg1 = Environment.GetCommandLineArgs()[pathIndex + 1];
+                if (Directory.Exists(arg1))
+                {
+                    path_textbox.Text = arg1;
+                }
+            }
+
+            if (Array.IndexOf(Environment.GetCommandLineArgs(), "--no-dialog") != -1)
+            {
+                Task.Delay(10).ContinueWith(x => Application.Current.Dispatcher.Invoke(Start));
+            }
+
         }
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
@@ -44,12 +62,13 @@ namespace MosaicGallery
             seed_num.Text = new Random().Next(99999).ToString();
             path_textbox.Focus();
 
-            new ResourceController(scrollGrid).StartVisabilityControl(_imgPositions, (double pos) => Math.Abs(pos - scrollContentOffset) < visabilityDistance, () => DateTime.Now.Ticks - lastScrollTime < 1000 * TimeSpan.TicksPerMillisecond);
+            var resourceController = new ResourceController(scrollGrid);
+            resourceController.StartVisibilityControl(_imgPositions, (double pos) => Math.Abs(pos - scrollContentOffset) < visabilityDistance, () => DateTime.Now.Ticks - lastScrollTime < 1000 * TimeSpan.TicksPerMillisecond);
         }
 
         private void scrollGrid_SizeChanged(object sender, SizeChangedEventArgs e)
         {
-            if (e.WidthChanged)
+            if (e.WidthChanged && e.PreviousSize.Width != 0)
             {
                 var d = e.NewSize.Width / e.PreviousSize.Width;
 
@@ -72,6 +91,19 @@ namespace MosaicGallery
 
         private void ok_button_Click_1(object sender, RoutedEventArgs e)
         {
+            Start();
+        }
+
+        private void Start()
+        {
+            var path = path_textbox.Text;
+
+            if (!Directory.Exists(path))
+            {
+                MessageBox.Show("Folder not found");
+                return;
+            }
+
             if (!int.TryParse(seed_num.Text, out int seed))
             {
                 seed = DateTime.Now.Millisecond;
@@ -82,9 +114,11 @@ namespace MosaicGallery
                 group_space = 0;
             }
 
-            var imPlacer = new ImagePlacer(path_textbox.Text, scrollGrid)
+            var imPlacer = new ImagePlacer(path, scrollGrid)
             {
-                SearchOption = subfolders_checkbox.IsChecked == true ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly,
+                SearchOption = subfolders_checkbox.IsChecked == true
+                    ? SearchOption.AllDirectories
+                    : SearchOption.TopDirectoryOnly,
                 Seed = seed,
                 GroupSpace = group_space,
                 IsGrouping = grouping_checkbox.IsChecked ?? false,
@@ -113,7 +147,8 @@ namespace MosaicGallery
                     break;
             }
 
-            imPlacer.ImageClickHandler = (sender1, e1) => {
+            imPlacer.ImageClickHandler = (sender1, e1) =>
+            {
                 if (Keyboard.IsKeyDown(Key.LeftShift))
                 {
                     var img = sender1 as Image;
@@ -134,31 +169,32 @@ namespace MosaicGallery
             {
                 imPlacer.ContextMenu = new ContextMenu();
                 var reopen_item = new MenuItem() { Header = "Select folder..." };
-                reopen_item.Click += (s1, e1) => {
-                    OpenMenu_Click(s1, e1);
-                };
+                reopen_item.Click += (s1, e1) => { OpenMenu_Click(s1, e1); };
                 imPlacer.ContextMenu.Items.Add(reopen_item);
 
                 var open_file = new MenuItem() { Header = "Open file" };
-                open_file.Click += (s1, e1) => {
+                open_file.Click += (s1, e1) =>
+                {
                     var image = ((s1 as MenuItem).Parent as ContextMenu).PlacementTarget as Image;
-                    var path = image.Tag.ToString();
-                    System.Diagnostics.Process.Start(path);
+                    var imgPath = image.Tag.ToString();
+                    System.Diagnostics.Process.Start(imgPath);
                 };
                 imPlacer.ContextMenu.Items.Add(open_file);
 
                 var reveal_menu = new MenuItem() { Header = "Reveal in explorer" };
-                reveal_menu.Click += (s1, e1) => {
+                reveal_menu.Click += (s1, e1) =>
+                {
                     var image = ((s1 as MenuItem).Parent as ContextMenu).PlacementTarget as Image;
-                    var path = image.Tag.ToString();
-                    string argument = "/select, \"" + path + "\"";
+                    var imgPath = image.Tag.ToString();
+                    string argument = "/select, \"" + imgPath + "\"";
                     System.Diagnostics.Process.Start("explorer.exe", argument);
                 };
                 imPlacer.ContextMenu.Items.Add(reveal_menu);
 
 
                 var delete_menu = new MenuItem() { Header = "Delete" };
-                delete_menu.Click += (s1, e1) => {
+                delete_menu.Click += (s1, e1) =>
+                {
                     var image = ((s1 as MenuItem).Parent as ContextMenu).PlacementTarget as Image;
 
                     if (_selectionProcessor.Contains(image.Parent as Border))
@@ -172,19 +208,13 @@ namespace MosaicGallery
                 };
                 imPlacer.ContextMenu.Items.Add(delete_menu);
             }
-
-            if (imPlacer.LoadImages(_imgPositions, (double pos) => Math.Abs(pos - scrollContentOffset) < visabilityDistance, ()=> scrollRemain >= 1500, () => DateTime.Now.Ticks - lastScrollTime < 1000 * TimeSpan.TicksPerMillisecond))
-            {
-                scrollViewer.ScrollToVerticalOffset(0);
-                load_grid.Visibility = Visibility.Collapsed;
-            }
-            else
-            {
-                MessageBox.Show("Folder not found");
-            }
+            
+            imPlacer.LoadImages(_imgPositions, (double pos) => Math.Abs(pos - scrollContentOffset) < visabilityDistance, () => scrollRemain >= 1500, () => DateTime.Now.Ticks - lastScrollTime < 1000 * TimeSpan.TicksPerMillisecond);
+            scrollViewer.ScrollToVerticalOffset(0);
+            load_grid.Visibility = Visibility.Collapsed;
         }
 
-       
+
         private void open_btn_Click(object sender, RoutedEventArgs e)
         {
             using (var dialog = new System.Windows.Forms.FolderBrowserDialog())
@@ -317,10 +347,6 @@ namespace MosaicGallery
                 bigImageContainer.Visibility = Visibility.Visible;
                 bigImageContainer.Tag = imgContainer;
             }
-        }
-
-        private void Grid_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
         }
     }
 }

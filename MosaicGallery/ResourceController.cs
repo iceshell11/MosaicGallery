@@ -23,7 +23,7 @@ namespace MosaicGallery
             this.scrollGrid = scrollGrid;
         }
 
-        public void StartVisabilityControl(ConcurrentBag<ImageUIInfo> imgPositions, Func<double, bool> isVisiblePred, Func<bool> isScrolling)
+        public void StartVisibilityControl(ConcurrentBag<ImageUIInfo> imgPositions, Func<double, bool> isVisiblePred, Func<bool> isScrolling)
         {
             Task.Run(async () => {
 
@@ -34,7 +34,7 @@ namespace MosaicGallery
 
                     double scaleY = scrollGrid.RenderSize.Width / 6 / 1.4142857;
 
-                    var toUpdate = imgPositions.Where(x => x.visible != isVisiblePred(x.pos * scaleY)).ToArray();
+                    var toUpdate = imgPositions.Where(x => x.Visible != isVisiblePred(x.Pos * scaleY)).ToArray();
 
                     if (toUpdate.Any())
                     {
@@ -42,11 +42,11 @@ namespace MosaicGallery
                         {
                             Application.Current.Dispatcher.Invoke(() =>
                             {
-                                item.visible = !item.visible;
+                                item.Img.Visibility = item.Visible ? Visibility.Collapsed : Visibility.Visible;
 
-                                var img = item.img;
+                                var img = item.Img;
 
-                                if (!item.visible && img.Source is BitmapImage bitmap && bitmap.StreamSource is Stream stream)
+                                if (!item.Visible && img.Source is BitmapImage bitmap && bitmap.StreamSource is Stream stream)
                                 {
                                     img.Source = null;
                                     img.UpdateLayout();
@@ -55,7 +55,7 @@ namespace MosaicGallery
                                     //stream.Dispose();
 
                                 }
-                                else if (item.visible)
+                                else if (item.Visible)
                                 {
                                     img.Source = null;
 
@@ -68,8 +68,6 @@ namespace MosaicGallery
 
                                     img.Source = bitmap;
                                 }
-
-                                img.Visibility = item.visible ? Visibility.Visible : Visibility.Collapsed;
                             });
 
                             await Task.Delay(isScrolling() ? ImageLoadDelay * 4 : ImageLoadDelay);

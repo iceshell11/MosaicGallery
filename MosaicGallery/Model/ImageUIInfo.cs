@@ -3,14 +3,21 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Controls;
 
 namespace MosaicGallery.Model
 {
-    public class ImageUIInfo
+    public class ImageUIInfo : ImageInfo
     {
-        public Image img;
-        public int pos;
-        public bool visible;
+        public Image Img;
+        public int Pos;
+        public ImageContainer Container;
+
+        public ImageUIInfo(ImageInfo imageInfo) : base(imageInfo.Filename, imageInfo.Orientation)
+        {
+        }
+
+        public bool Visible => Img.Visibility == Visibility.Visible;
     }
 }
