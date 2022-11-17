@@ -241,11 +241,11 @@ namespace MosaicGallery
 
         public async void PlaceImages(IEnumerable<ImageUIInfo> imgPositions, Random rand)
         {
-            IsLoading = true;
             while (IsLoading)
             {
                 await Task.Delay(100);
             }
+            IsLoading = true;
 
             var scale = Scale;
 
