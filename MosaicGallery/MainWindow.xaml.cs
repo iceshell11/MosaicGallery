@@ -2,14 +2,17 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 
 namespace MosaicGallery
 {
@@ -27,19 +30,19 @@ namespace MosaicGallery
         private int imageLoadDelay = 15;
 
 
-        Point scrollMousePoint = new Point();
-        double hOff = 1;
+        private Point scrollMousePoint = new Point();
+        private double hOff = 1;
+        private CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
 
-        private ConcurrentBag<ImageUIInfo> _imgPositions = new ConcurrentBag<ImageUIInfo>();
-
-        private SelectionProcessor _selectionProcessor = new SelectionProcessor();
-        private FileProcessor _fileProcessor = new FileProcessor();
+        private readonly ConcurrentBag<ImageUIInfo> _imgPositions = new ConcurrentBag<ImageUIInfo>();
+        private readonly SelectionProcessor _selectionProcessor = new SelectionProcessor();
+        private readonly FileProcessor _fileProcessor = new FileProcessor();
 
         public MainWindow()
         {
             InitializeComponent();
 
-            int pathIndex = Array.IndexOf(Environment.GetCommandLineArgs(), "--path");  
+            int pathIndex = Array.IndexOf(Environment.GetCommandLineArgs(), "--path");
 
             if (pathIndex != -1)
             {
@@ -54,7 +57,6 @@ namespace MosaicGallery
             {
                 Task.Delay(10).ContinueWith(x => Application.Current.Dispatcher.Invoke(Start));
             }
-
         }
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
@@ -166,64 +168,69 @@ namespace MosaicGallery
                 }
             };
 
-            {
-                imPlacer.ContextMenu = new ContextMenu();
-                var reopen_item = new MenuItem() { Header = "Select folder..." };
-                reopen_item.Click += (s1, e1) => { OpenMenu_Click(s1, e1); };
-                imPlacer.ContextMenu.Items.Add(reopen_item);
-
-                var open_file = new MenuItem() { Header = "Open file" };
-                open_file.Click += (s1, e1) =>
-                {
-                    var image = ((s1 as MenuItem).Parent as ContextMenu).PlacementTarget as Image;
-                    var imgPath = image.Tag.ToString();
-                    System.Diagnostics.Process.Start(imgPath);
-                };
-                imPlacer.ContextMenu.Items.Add(open_file);
-
-                var reveal_menu = new MenuItem() { Header = "Reveal in explorer" };
-                reveal_menu.Click += (s1, e1) =>
-                {
-                    var image = ((s1 as MenuItem).Parent as ContextMenu).PlacementTarget as Image;
-                    var imgPath = image.Tag.ToString();
-                    string argument = "/select, \"" + imgPath + "\"";
-                    System.Diagnostics.Process.Start("explorer.exe", argument);
-                };
-                imPlacer.ContextMenu.Items.Add(reveal_menu);
-
-
-                var delete_menu = new MenuItem() { Header = "Delete" };
-                delete_menu.Click += (s1, e1) =>
-                {
-                    var image = ((s1 as MenuItem).Parent as ContextMenu).PlacementTarget as Image;
-
-                    if (_selectionProcessor.Contains(image.Parent as Border))
-                    {
-                        _fileProcessor.DeleteImages(_selectionProcessor.SelectedImages);
-                    }
-                    else
-                    {
-                        _fileProcessor.DeleteImages(image);
-                    }
-                };
-                imPlacer.ContextMenu.Items.Add(delete_menu);
-            }
-            
-            imPlacer.LoadImages(_imgPositions, (double pos) => Math.Abs(pos - scrollContentOffset) < visabilityDistance, () => scrollRemain >= 1500, () => DateTime.Now.Ticks - lastScrollTime < 1000 * TimeSpan.TicksPerMillisecond);
+            CreateContextMenu(imPlacer);
+            imPlacer.LoadImages(_imgPositions, (double pos) => Math.Abs(pos - scrollContentOffset) < visabilityDistance, () => scrollRemain >= 1500, () => DateTime.Now.Ticks - lastScrollTime < 1000 * TimeSpan.TicksPerMillisecond, _cancellationTokenSource.Token);
             scrollViewer.ScrollToVerticalOffset(0);
             load_grid.Visibility = Visibility.Collapsed;
+        }
+
+        private void CreateContextMenu(ImagePlacer imPlacer)
+        {
+            imPlacer.ContextMenu = new ContextMenu();
+            var reopen_item = new MenuItem() { Header = "Select folder..." };
+            reopen_item.Click += OpenMenu_Click;
+            imPlacer.ContextMenu.Items.Add(reopen_item);
+
+            var open_file = new MenuItem() { Header = "Open file" };
+            open_file.Click += (s1, e1) =>
+            {
+                _cancellationTokenSource.Cancel();
+                _cancellationTokenSource = new CancellationTokenSource();
+                imPlacer.PlaceImages(_imgPositions, new Random());
+                // var image = ((s1 as MenuItem).Parent as ContextMenu).PlacementTarget as Image;
+                // var imgPath = image.Tag.ToString();
+                // System.Diagnostics.Process.Start(imgPath);
+            };
+            imPlacer.ContextMenu.Items.Add(open_file);
+
+            var reveal_menu = new MenuItem() { Header = "Reveal in explorer" };
+            reveal_menu.Click += (s1, e1) =>
+            {
+                var image = ((s1 as MenuItem).Parent as ContextMenu).PlacementTarget as Image;
+                var imgPath = image.Tag.ToString();
+                string argument = "/select, \"" + imgPath + "\"";
+                System.Diagnostics.Process.Start("explorer.exe", argument);
+            };
+            imPlacer.ContextMenu.Items.Add(reveal_menu);
+
+
+            var delete_menu = new MenuItem() { Header = "Delete" };
+            delete_menu.Click += (s1, e1) =>
+            {
+                var image = ((s1 as MenuItem).Parent as ContextMenu).PlacementTarget as Image;
+
+                if (_selectionProcessor.Contains(image.Parent as Border))
+                {
+                    _fileProcessor.DeleteImages(_selectionProcessor.SelectedImages);
+                }
+                else
+                {
+                    _fileProcessor.DeleteImages(image);
+                }
+            };
+            imPlacer.ContextMenu.Items.Add(delete_menu);
         }
 
 
         private void open_btn_Click(object sender, RoutedEventArgs e)
         {
-            using (var dialog = new System.Windows.Forms.FolderBrowserDialog())
-            {
-                if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
-                {
-                    path_textbox.Text = dialog.SelectedPath;
-                }
-            }
+            //using (var dialog = new System.Windows.Forms.FolderBrowserDialog())
+            //{
+            //    if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+            //    {
+            //        path_textbox.Text = dialog.SelectedPath;
+            //    }
+            //}
         }
 
         private void OpenMenu_Click(object sender, RoutedEventArgs e)

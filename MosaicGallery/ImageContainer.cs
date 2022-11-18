@@ -16,7 +16,7 @@ namespace MosaicGallery
     public class ImageContainer : Border
     {
         private readonly Grid _grid = new Grid();
-        private readonly Image _image;
+        private Image _image;
         public ImageContainer(Image imgItem, Size size, Thickness margin, string metadata = null)
         {
             this._image = imgItem;
@@ -39,7 +39,7 @@ namespace MosaicGallery
                     Margin = new Thickness(3),
                     HorizontalAlignment = HorizontalAlignment.Right,
                     VerticalAlignment = VerticalAlignment.Top,
-                    Source = new BitmapImage(new Uri("pack://application:,,,/Resources/comment.png")),
+                    Source = new BitmapImage(new Uri("/Resources/comment.png", UriKind.Relative)),
                     Stretch = Stretch.UniformToFill,
                     Visibility = Visibility.Visible,
                     ToolTip = new ToolTip()
@@ -58,6 +58,15 @@ namespace MosaicGallery
             }
         }
 
-        public Image Image => _image;
+        public Image Image
+        {
+            get => _image;
+            set
+            {
+                _grid.Children.Remove(_image);
+                _grid.Children.Insert(0, value);
+                _image = value;
+            }
+        }
     }
 }

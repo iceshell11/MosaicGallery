@@ -10,7 +10,6 @@ namespace MosaicGallery.Model
 {
     public class ImageUIInfo : ImageInfo
     {
-        public Image Img;
         public int Pos;
         public ImageContainer Container;
 
@@ -18,6 +17,7 @@ namespace MosaicGallery.Model
         {
         }
 
+        public Image Img => Container.Image;
         public bool Visible => Img.Visibility == Visibility.Visible;
     }
 }

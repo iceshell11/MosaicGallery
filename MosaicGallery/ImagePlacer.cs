@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Media.Imaging;
 using System.Windows;
@@ -10,7 +11,6 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using MosaicGallery.Model;
 using System.Windows.Input;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement.Rebar;
 
 namespace MosaicGallery
 {
@@ -54,7 +54,7 @@ namespace MosaicGallery
             (3, LargeCount),
         };
 
-        public async void LoadImages(ConcurrentBag<ImageUIInfo> imgPositions, Func<double, bool> isVisiblePred, Func<bool> continueLoadingPred, Func<bool> isScrolling)
+        public async void LoadImages(ConcurrentBag<ImageUIInfo> imgPositions, Func<double, bool> isVisiblePred, Func<bool> continueLoadingPred, Func<bool> isScrolling, CancellationToken cancellationToken)
         {
             LoadTime = DateTime.Now;
 
@@ -178,12 +178,10 @@ namespace MosaicGallery
                         var img = block.Img;
                         var margin = GetImageMargin(block.Pos, Scale, h);
 
-                        var bitmap = new BitmapImage();
 
                         var imgItem = new Image()
                         {
                             Visibility = Visibility.Collapsed,
-                            Source = bitmap,
                             Stretch = Stretch.UniformToFill,
                             HorizontalAlignment = HorizontalAlignment.Center,
                             VerticalAlignment = VerticalAlignment.Center,
@@ -203,7 +201,6 @@ namespace MosaicGallery
 
                         imgPositions.Add(new ImageUIInfo(block.Img)
                         {
-                            Img = imgItem,
                             Pos = (int)(block.Pos.Row + h),
                             Container = imageContainer
                         });
@@ -212,7 +209,7 @@ namespace MosaicGallery
                     });
                     await Task.Delay(isScrolling() ? ImageLoadDelay * 4 : ImageLoadDelay);
 
-                    if (taskStartTime != LoadTime)
+                    if (taskStartTime != LoadTime || cancellationToken.IsCancellationRequested)
                     {
                         break;
                     }
@@ -223,10 +220,18 @@ namespace MosaicGallery
                     while (continueLoadingPred() && taskStartTime == LoadTime)
                     {
                         await Task.Delay(100);
+                        if (cancellationToken.IsCancellationRequested)
+                        {
+                            break;
+                        }
                     }
                 }
 
                 h += mosaic.matrix.Count + GroupSpace / 100.0;
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    break;
+                }
             }
 
             IsLoading = false;
@@ -251,21 +256,21 @@ namespace MosaicGallery
 
             var images = new List<ImageUIInfo>(imgPositions);
 
-            List<ImageUIInfo> taken;
-            if (IsGrouping)
-            {
-                taken = images.Take(rand.Next(ImgPerGroup.from, ImgPerGroup.to + 1)).ToList();
-                images.RemoveRange(0, taken.Count);
-            }
-            else
-            {
-                taken = new List<ImageUIInfo>(images);
-                images.Clear();
-            }
-
             double h = 0;
             while (images.Any())
             {
+                List<ImageUIInfo> taken;
+                if (IsGrouping)
+                {
+                    taken = images.Take(rand.Next(ImgPerGroup.from, ImgPerGroup.to + 1)).ToList();
+                    images.RemoveRange(0, taken.Count);
+                }
+                else
+                {
+                    taken = new List<ImageUIInfo>(images);
+                    images.Clear();
+                }
+
                 var mosaic = new MosaicMatrix(SplitCount);
 
                 mosaic.FitImages(taken.Cast<ImageInfo>().ToList(), rand, Sizes);
