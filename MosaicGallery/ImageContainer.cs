@@ -17,15 +17,12 @@ namespace MosaicGallery
     {
         private readonly Grid _grid = new Grid();
         private Image _image;
-        public ImageContainer(Image imgItem, Size size, Thickness margin, string metadata = null)
+        public ImageContainer(Image imgItem, string metadata = null)
         {
             this._image = imgItem;
             Child = _grid;
             HorizontalAlignment = HorizontalAlignment.Left;
             VerticalAlignment = VerticalAlignment.Top;
-            Margin = margin;
-            Width = size.Width;
-            Height = size.Height;
             BorderThickness = new Thickness(2, 2, 2, 2);
             Tag = "Image";
 

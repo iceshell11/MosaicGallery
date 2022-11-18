@@ -18,9 +18,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="Resources\apps.png" />
-    <EmbeddedResource Include="Resources\comment.png" />
-    <EmbeddedResource Include="Resources\exclamation.png" />
+    <Resource Include="Resources\apps.png" />
+    <Resource Include="Resources\comment.png" />
+    <Resource Include="Resources\exclamation.png" />
   </ItemGroup>
 
 </Project>

@@ -8,6 +8,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
@@ -16,6 +17,8 @@ namespace MosaicGallery
     public class ResourceController
     {
         public int ImageLoadDelay;
+        public MouseButtonEventHandler ImageClickHandler;
+        public ContextMenu ContextMenu;
 
         private Grid scrollGrid;
 
@@ -108,13 +111,17 @@ namespace MosaicGallery
 
         private Image CloneImage(Image itemImg)
         {
-            return new Image() { 
+            var image = new Image() { 
                 Tag = itemImg.Tag,
                 Margin = itemImg.Margin,
                 Width = itemImg.Width, 
                 Height = itemImg.Height,
-                Visibility = itemImg.Visibility
+                Visibility = itemImg.Visibility,
             };
+
+            image.ContextMenu = ContextMenu;
+            image.PreviewMouseLeftButtonDown += ImageClickHandler;
+            return image;
         }
     }
 }

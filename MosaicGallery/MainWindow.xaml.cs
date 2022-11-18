@@ -38,6 +38,9 @@ namespace MosaicGallery
         private readonly SelectionProcessor _selectionProcessor = new SelectionProcessor();
         private readonly FileProcessor _fileProcessor = new FileProcessor();
 
+        private MouseButtonEventHandler _imageClickHandler;
+        private ContextMenu _contextMenu;
+
         public MainWindow()
         {
             InitializeComponent();
@@ -61,12 +64,87 @@ namespace MosaicGallery
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
+            _imageClickHandler = (sender1, e1) =>
+            {
+                if (Keyboard.IsKeyDown(Key.LeftShift))
+                {
+                    var img = sender1 as Image;
+                    _selectionProcessor.ToggleSelection(img.FindParent<ImageContainer>());
+                }
+                else
+                {
+                    _selectionProcessor.ResetSelection();
+
+                    if (e1.ClickCount == 2)
+                    {
+                        var img = sender1 as Image;
+                        SetBigImage(img.FindParent<ImageContainer>());
+                    }
+                }
+            };
+            _contextMenu = CreateContextMenu();
+
             seed_num.Text = new Random().Next(99999).ToString();
             path_textbox.Focus();
 
-            var resourceController = new ResourceController(scrollGrid);
+            var resourceController = new ResourceController(scrollGrid)
+            {
+                ContextMenu = _contextMenu,
+                ImageClickHandler = _imageClickHandler
+            };
             resourceController.StartVisibilityControl(_imgPositions, (double pos) => Math.Abs(pos - scrollContentOffset) < visabilityDistance, () => DateTime.Now.Ticks - lastScrollTime < 1000 * TimeSpan.TicksPerMillisecond);
         }
+
+
+        private ContextMenu CreateContextMenu()
+        {
+            var contextMenu = new ContextMenu();
+
+            var reopen_item = new MenuItem() { Header = "Select folder..." };
+            reopen_item.Click += OpenMenu_Click;
+            contextMenu.Items.Add(reopen_item);
+
+            var open_file = new MenuItem() { Header = "Open file" };
+            open_file.Click += (s1, e1) =>
+            {
+                // _cancellationTokenSource.Cancel();
+                // _cancellationTokenSource = new CancellationTokenSource();
+                // imPlacer.PlaceImages(_imgPositions, new Random());
+                var image = ((s1 as MenuItem).Parent as ContextMenu).PlacementTarget as Image;
+                var imgPath = image.Tag.ToString();
+                Process.Start(imgPath);
+            };
+            contextMenu.Items.Add(open_file);
+
+            var reveal_menu = new MenuItem() { Header = "Reveal in explorer" };
+            reveal_menu.Click += (s1, e1) =>
+            {
+                var image = ((s1 as MenuItem).Parent as ContextMenu).PlacementTarget as Image;
+                var imgPath = image.Tag.ToString();
+                string argument = "/select, \"" + imgPath + "\"";
+                System.Diagnostics.Process.Start("explorer.exe", argument);
+            };
+            contextMenu.Items.Add(reveal_menu);
+
+
+            var delete_menu = new MenuItem() { Header = "Delete" };
+            delete_menu.Click += (s1, e1) =>
+            {
+                var image = ((s1 as MenuItem).Parent as ContextMenu).PlacementTarget as Image;
+
+                if (_selectionProcessor.Contains(image.Parent as Border))
+                {
+                    _fileProcessor.DeleteImages(_selectionProcessor.SelectedImages);
+                }
+                else
+                {
+                    _fileProcessor.DeleteImages(image);
+                }
+            };
+            contextMenu.Items.Add(delete_menu);
+            return contextMenu;
+        }
+
 
         private void scrollGrid_SizeChanged(object sender, SizeChangedEventArgs e)
         {
@@ -128,6 +206,8 @@ namespace MosaicGallery
                 MediumCount = (int)medium_slider.Value,
                 LargeCount = (int)large_slider.Value,
                 ImageLoadDelay = imageLoadDelay,
+                ImageClickHandler = _imageClickHandler,
+                ContextMenu = _contextMenu
             };
 
             switch (orderType.SelectedIndex)
@@ -149,78 +229,13 @@ namespace MosaicGallery
                     break;
             }
 
-            imPlacer.ImageClickHandler = (sender1, e1) =>
+            imPlacer.PrepareImages().ContinueWith(_ =>
             {
-                if (Keyboard.IsKeyDown(Key.LeftShift))
-                {
-                    var img = sender1 as Image;
-                    _selectionProcessor.ToggleSelection(img.FindParent<ImageContainer>());
-                }
-                else
-                {
-                    _selectionProcessor.ResetSelection();
-
-                    if (e1.ClickCount == 2)
-                    {
-                        var img = sender1 as Image;
-                        SetBigImage(img.FindParent<ImageContainer>());
-                    }
-                }
-            };
-
-            CreateContextMenu(imPlacer);
-            imPlacer.LoadImages(_imgPositions, (double pos) => Math.Abs(pos - scrollContentOffset) < visabilityDistance, () => scrollRemain >= 1500, () => DateTime.Now.Ticks - lastScrollTime < 1000 * TimeSpan.TicksPerMillisecond, _cancellationTokenSource.Token);
+                imPlacer.LoadImages(_imgPositions, () => scrollRemain >= 1500, () => DateTime.Now.Ticks - lastScrollTime < 1000 * TimeSpan.TicksPerMillisecond, _cancellationTokenSource.Token);
+            });
             scrollViewer.ScrollToVerticalOffset(0);
             load_grid.Visibility = Visibility.Collapsed;
         }
-
-        private void CreateContextMenu(ImagePlacer imPlacer)
-        {
-            imPlacer.ContextMenu = new ContextMenu();
-            var reopen_item = new MenuItem() { Header = "Select folder..." };
-            reopen_item.Click += OpenMenu_Click;
-            imPlacer.ContextMenu.Items.Add(reopen_item);
-
-            var open_file = new MenuItem() { Header = "Open file" };
-            open_file.Click += (s1, e1) =>
-            {
-                _cancellationTokenSource.Cancel();
-                _cancellationTokenSource = new CancellationTokenSource();
-                imPlacer.PlaceImages(_imgPositions, new Random());
-                // var image = ((s1 as MenuItem).Parent as ContextMenu).PlacementTarget as Image;
-                // var imgPath = image.Tag.ToString();
-                // System.Diagnostics.Process.Start(imgPath);
-            };
-            imPlacer.ContextMenu.Items.Add(open_file);
-
-            var reveal_menu = new MenuItem() { Header = "Reveal in explorer" };
-            reveal_menu.Click += (s1, e1) =>
-            {
-                var image = ((s1 as MenuItem).Parent as ContextMenu).PlacementTarget as Image;
-                var imgPath = image.Tag.ToString();
-                string argument = "/select, \"" + imgPath + "\"";
-                System.Diagnostics.Process.Start("explorer.exe", argument);
-            };
-            imPlacer.ContextMenu.Items.Add(reveal_menu);
-
-
-            var delete_menu = new MenuItem() { Header = "Delete" };
-            delete_menu.Click += (s1, e1) =>
-            {
-                var image = ((s1 as MenuItem).Parent as ContextMenu).PlacementTarget as Image;
-
-                if (_selectionProcessor.Contains(image.Parent as Border))
-                {
-                    _fileProcessor.DeleteImages(_selectionProcessor.SelectedImages);
-                }
-                else
-                {
-                    _fileProcessor.DeleteImages(image);
-                }
-            };
-            imPlacer.ContextMenu.Items.Add(delete_menu);
-        }
-
 
         private void open_btn_Click(object sender, RoutedEventArgs e)
         {
