@@ -1,15 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Image = System.Windows.Controls.Image;
-using Size = System.Windows.Size;
 
 namespace MosaicGallery
 {
@@ -17,7 +18,7 @@ namespace MosaicGallery
     {
         private readonly Grid _grid = new Grid();
         private Image _image;
-        public ImageContainer(Image imgItem, string metadata = null)
+        public ImageContainer(Image imgItem, string? metadata)
         {
             this._image = imgItem;
             Child = _grid;
@@ -64,6 +65,43 @@ namespace MosaicGallery
                 _grid.Children.Insert(0, value);
                 _image = value;
             }
+        }
+
+        public void ResetImage(ContextMenu contextMenu, MouseButtonEventHandler imageClickHandler)
+        {
+            Stream? stream = (Image.Source as BitmapImage)?.StreamSource;
+            ResetImage(stream, contextMenu, imageClickHandler);
+        }
+
+        public void ResetImage(Stream? stream, ContextMenu contextMenu, MouseButtonEventHandler imageClickHandler)
+        {
+            if (stream != null)
+            {
+                stream.Close();
+                stream.Dispose();
+                Image.Source = null;
+                Image.Visibility = Visibility.Collapsed;
+                Image.CacheMode = new BitmapCache();
+                Image.UpdateLayout();
+                Image = CloneImage(Image, contextMenu, imageClickHandler);
+                Image.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        private Image CloneImage(Image itemImg, ContextMenu contextMenu, MouseButtonEventHandler imageClickHandler)
+        {
+            var image = new Image()
+            {
+                Tag = itemImg.Tag,
+                Margin = itemImg.Margin,
+                Width = itemImg.Width,
+                Height = itemImg.Height,
+                Visibility = itemImg.Visibility,
+            };
+
+            image.ContextMenu = contextMenu;
+            image.PreviewMouseLeftButtonDown += imageClickHandler;
+            return image;
         }
     }
 }

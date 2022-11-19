@@ -11,6 +11,7 @@ namespace MosaicGallery.Model
         public string Filename { get; set; }
 
         public Orientation Orientation { get; set; }
+        public string? Metadata { get; set; }
 
         public ImageInfo(string filename, Orientation orientation)
         {
@@ -21,6 +22,13 @@ namespace MosaicGallery.Model
         public override string ToString()
         {
             return Filename;
+        }
+
+        public bool IsMatchFilter(string filter)
+        {
+            return string.IsNullOrWhiteSpace(filter) 
+                   || Filename.Contains(filter, StringComparison.InvariantCultureIgnoreCase) 
+                   || Metadata?.Contains(filter, StringComparison.InvariantCultureIgnoreCase) == true;
         }
     }
 }

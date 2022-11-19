@@ -12,8 +12,6 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
 
 namespace MosaicGallery
 {
@@ -35,16 +33,20 @@ namespace MosaicGallery
         private double hOff = 1;
         private CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
 
-        private readonly ConcurrentBag<ImageUIInfo> _imgPositions = new ConcurrentBag<ImageUIInfo>();
+        private readonly ConcurrentBag<ImageUIInfo> _placedImages = new ConcurrentBag<ImageUIInfo>();
         private readonly SelectionProcessor _selectionProcessor = new SelectionProcessor();
         private readonly FileProcessor _fileProcessor = new FileProcessor();
+        private ImagePlacer _imPlacer;
 
         private MouseButtonEventHandler _imageClickHandler;
         private ContextMenu _contextMenu;
+        private string _searchText = "";
+        private readonly SemaphoreSlim _imagesSemaphore = new SemaphoreSlim(1, 1);
 
         public MainWindow()
         {
             InitializeComponent();
+            _imPlacer = new ImagePlacer(scrollGrid, _placedImages, _imagesSemaphore);
 
             int pathIndex = Array.IndexOf(Environment.GetCommandLineArgs(), "--path");
 
@@ -88,14 +90,30 @@ namespace MosaicGallery
             seed_num.Text = new Random().Next(99999).ToString();
             path_textbox.Focus();
 
-            var resourceController = new ResourceController(scrollGrid)
+            var resourceController = new ResourceController(scrollGrid, _placedImages, _imagesSemaphore)
             {
                 ContextMenu = _contextMenu,
                 ImageClickHandler = _imageClickHandler
             };
-            resourceController.StartVisibilityControl(_imgPositions, (double pos) => Math.Abs(pos - scrollContentOffset) < visabilityDistance, () => DateTime.Now.Ticks - lastScrollTime < 1000 * TimeSpan.TicksPerMillisecond);
-        }
+            resourceController.StartVisibilityControl((double pos) => Math.Abs(pos - scrollContentOffset) < visabilityDistance, () => DateTime.Now.Ticks - lastScrollTime < 1000 * TimeSpan.TicksPerMillisecond);
 
+            Task.Run(async () =>
+            {
+                while (true)
+                {
+                    await Task.Delay(100);
+                    if (_searchText != _imPlacer.Filter)
+                    {
+                        _imPlacer.Filter = _searchText;
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            scrollViewer.ScrollToVerticalOffset(0);
+                        });
+                        await Task.Delay(3000);
+                    }
+                }
+            });
+        }
 
         private ContextMenu CreateContextMenu()
         {
@@ -110,7 +128,7 @@ namespace MosaicGallery
             {
                 // _cancellationTokenSource.Cancel();
                 // _cancellationTokenSource = new CancellationTokenSource();
-                // imPlacer.PlaceImages(_imgPositions, new Random());
+                // imPlacer.PlaceImages(_placedImages, new Random());
                 var image = ((s1 as MenuItem).Parent as ContextMenu).PlacementTarget as Image;
                 var imgPath = image.Tag.ToString();
                 Process.Start(imgPath);
@@ -146,7 +164,6 @@ namespace MosaicGallery
             return contextMenu;
         }
 
-
         private void scrollGrid_SizeChanged(object sender, SizeChangedEventArgs e)
         {
             if (e.WidthChanged && e.PreviousSize.Width != 0)
@@ -161,7 +178,6 @@ namespace MosaicGallery
                 }
             }
         }
-
 
         private void scrollViewer_ScrollChanged(object sender, ScrollChangedEventArgs e)
         {
@@ -195,44 +211,40 @@ namespace MosaicGallery
                 group_space = 0;
             }
 
-            var imPlacer = new ImagePlacer(path, scrollGrid)
-            {
-                SearchOption = subfolders_checkbox.IsChecked == true
-                    ? SearchOption.AllDirectories
-                    : SearchOption.TopDirectoryOnly,
-                Seed = seed,
-                GroupSpace = group_space,
-                IsGrouping = grouping_checkbox.IsChecked ?? false,
-                SmallCount = (int)small_slider.Value,
-                MediumCount = (int)medium_slider.Value,
-                LargeCount = (int)large_slider.Value,
-                ImageLoadDelay = imageLoadDelay,
-                ImageClickHandler = _imageClickHandler,
-                ContextMenu = _contextMenu
-            };
+            _imPlacer.Path = path;
+            _imPlacer.SearchOption = subfolders_checkbox.IsChecked == true ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
+            _imPlacer.Seed = seed;
+            _imPlacer.GroupSpace = group_space;
+            _imPlacer.IsGrouping = grouping_checkbox.IsChecked ?? false;
+            _imPlacer.SmallCount = (int)small_slider.Value;
+            _imPlacer.MediumCount = (int)medium_slider.Value;
+            _imPlacer.LargeCount = (int)large_slider.Value;
+            _imPlacer.ImageLoadDelay = imageLoadDelay;
+            _imPlacer.ImageClickHandler = _imageClickHandler;
+            _imPlacer.ContextMenu = _contextMenu;
 
             switch (orderType.SelectedIndex)
             {
                 case 0:
-                    imPlacer.OrderType = OrderType.CreationTypeDes;
+                    _imPlacer.OrderType = OrderType.CreationTypeDes;
                     break;
                 case 1:
-                    imPlacer.OrderType = OrderType.NameDes;
+                    _imPlacer.OrderType = OrderType.NameDes;
                     break;
                 case 2:
-                    imPlacer.OrderType = OrderType.Random;
+                    _imPlacer.OrderType = OrderType.Random;
                     break;
                 case 3:
-                    imPlacer.OrderType = OrderType.CreationTypeAsc;
+                    _imPlacer.OrderType = OrderType.CreationTypeAsc;
                     break;
                 case 4:
-                    imPlacer.OrderType = OrderType.NameAsc;
+                    _imPlacer.OrderType = OrderType.NameAsc;
                     break;
             }
 
-            imPlacer.PrepareImages().ContinueWith(_ =>
+            _imPlacer.PrepareImages().ContinueWith(_ =>
             {
-                imPlacer.LoadImages(_imgPositions, () => scrollRemain >= 1500, () => DateTime.Now.Ticks - lastScrollTime < 1000 * TimeSpan.TicksPerMillisecond, _cancellationTokenSource.Token);
+                _imPlacer.LoadImages(() => scrollRemain >= 1500, () => DateTime.Now.Ticks - lastScrollTime < 1000 * TimeSpan.TicksPerMillisecond, _cancellationTokenSource.Token);
             });
             scrollViewer.ScrollToVerticalOffset(0);
             load_grid.Visibility = Visibility.Collapsed;
@@ -310,7 +322,7 @@ namespace MosaicGallery
             var image = sender as Image;
             var path = image.Tag.ToString();
             string argument = "/select, \"" + path + "\"";
-            System.Diagnostics.Process.Start("explorer.exe", argument);
+            Process.Start("explorer.exe", argument);
         }
 
         private void bigImageContainer_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -356,7 +368,15 @@ namespace MosaicGallery
                         }
                     }
                 }
-              
+
+            }
+            else
+            {
+                if(e.Key == Key.F && Keyboard.IsKeyDown(Key.LeftCtrl))
+                {
+                    searchGrid.Visibility = Visibility.Visible;
+                    searchTextbox.Focus();
+                }
             }
         }
 
@@ -367,6 +387,24 @@ namespace MosaicGallery
                 bigImage.Source = imgContainer.Image.Source;
                 bigImageContainer.Visibility = Visibility.Visible;
                 bigImageContainer.Tag = imgContainer;
+            }
+        }
+
+        private void CloseSearchButtonClick(object sender, RoutedEventArgs e)
+        {
+            searchGrid.Visibility = Visibility.Collapsed;
+        }
+
+        private void searchTextbox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            _searchText = searchTextbox.Text;
+        }
+
+        private void SearchTextbox_OnPreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Escape)
+            {
+                searchGrid.Visibility = Visibility.Collapsed;
             }
         }
     }

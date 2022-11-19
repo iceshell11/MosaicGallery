@@ -10,7 +10,7 @@
         Title="Mosaic Gallery" Height="450" Width="800" Loaded="Window_Loaded">
 
     <Grid>
-        <Grid x:Name="load_grid" Background="#7F105EA5" Panel.ZIndex="100">
+        <Grid x:Name="load_grid" Background="#7F105EA5" Panel.ZIndex="100" Visibility="Visible">
             <Border BorderBrush="Black" BorderThickness="1" HorizontalAlignment="Center" VerticalAlignment="Center" Height="227" Width="404" Grid.Column="1">
                 <Border.Background>
                     <SolidColorBrush Color="{DynamicResource {x:Static SystemColors.ControlColorKey}}"/>
@@ -60,6 +60,18 @@
                     <Button x:Name="close_button_Copy" Content="Close" Margin="0,0,338,6" HorizontalAlignment="Right" Width="52" Height="22" VerticalAlignment="Bottom" Click="close_button_Copy_Click"/>
                 </Grid>
             </Border>
+        </Grid>
+        <Grid x:Name="searchGrid" Panel.ZIndex="50" HorizontalAlignment="Right" VerticalAlignment="Top" Visibility="Collapsed">
+            <StackPanel Orientation="Horizontal">
+                <TextBox x:Name="searchTextbox" 
+                         Width="400" 
+                         TextChanged="searchTextbox_TextChanged"
+                         PreviewKeyDown="SearchTextbox_OnPreviewKeyDown"
+                         Background="{DynamicResource {x:Static SystemColors.ScrollBarBrushKey}}"></TextBox>
+                <Button Click="CloseSearchButtonClick">
+                    <Image Source="/Resources/cross2.png" Width="15"/>
+                </Button>
+            </StackPanel>
         </Grid>
         <ScrollViewer x:Name="scrollViewer" ScrollChanged="scrollViewer_ScrollChanged" PreviewMouseWheel="scrollViewer_PreviewMouseWheel_1" >
             <Grid x:Name="scrollGrid" SizeChanged="scrollGrid_SizeChanged" PreviewMouseLeftButtonDown="grid_PreviewMouseLeftButtonDown" PreviewMouseMove="grid_PreviewMouseMove" PreviewMouseLeftButtonUp="grid_PreviewMouseLeftButtonUp">

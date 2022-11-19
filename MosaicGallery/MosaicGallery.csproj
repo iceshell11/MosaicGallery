@@ -10,6 +10,7 @@
   <ItemGroup>
     <None Remove="Resources\apps.png" />
     <None Remove="Resources\comment.png" />
+    <None Remove="Resources\cross2.png" />
     <None Remove="Resources\exclamation.png" />
   </ItemGroup>
 
@@ -21,6 +22,7 @@
   <ItemGroup>
     <Resource Include="Resources\apps.png" />
     <Resource Include="Resources\comment.png" />
+    <Resource Include="Resources\cross2.png" />
     <Resource Include="Resources\exclamation.png" />
   </ItemGroup>
 

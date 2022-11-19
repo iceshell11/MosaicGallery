@@ -11,6 +11,8 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using MosaicGallery.Model;
 using System.Windows.Input;
+using System.Windows.Shapes;
+using System.Windows.Documents;
 
 namespace MosaicGallery
 {
@@ -39,16 +41,32 @@ namespace MosaicGallery
         public MouseButtonEventHandler ImageClickHandler;
         public ContextMenu ContextMenu;
         public OrderType OrderType = OrderType.CreationTypeDes;
-
-        public List<ImageInfo> images { get; set; }
-        public List<ImageInfo> uiImages { get; set; }
         public Task ImagePrepareTask = Task.CompletedTask;
 
-        public ImagePlacer(string path, Grid scrollGrid)
+        private string _filter = "";
+        private double hOffset = 0;
+
+        private readonly List<ImageInfo> _unplacedImages = new List<ImageInfo>();
+        private readonly List<ImageInfo> _ignoredImages = new List<ImageInfo>();
+        private readonly ConcurrentBag<ImageUIInfo> _placedImages;
+        private readonly SemaphoreSlim _imagesSemaphore;
+        public ImagePlacer(Grid scrollGrid, ConcurrentBag<ImageUIInfo> placedImages, SemaphoreSlim imagesSemaphore)
         {
-            Path = path;
             this.scrollGrid = scrollGrid;
+            this._placedImages = placedImages;
+            this._imagesSemaphore = imagesSemaphore;
         }
+
+        public string Filter
+        {
+            get => _filter;
+            set
+            {
+                _filter = value;
+                ResetDisplayedImages();
+            }
+        }
+
 
         (int size, int weight)[] Sizes => new (int size, int weight)[]
         {
@@ -57,35 +75,15 @@ namespace MosaicGallery
             (3, LargeCount),
         };
 
+
         public Task PrepareImages()
         {
             ImagePrepareTask.Wait();
 
             ImagePrepareTask = Task.Run(() =>
             {
-                Random rand = new Random(Seed);
-
-                var usorted_files = Directory.GetFiles(Path, "*", SearchOption).Where(x =>
-                    Extentions.Any(y => x.EndsWith(y, StringComparison.OrdinalIgnoreCase)));
-                string[] files = null;
-                switch (OrderType)
-                {
-                    case OrderType.CreationTypeDes:
-                        files = usorted_files.OrderByDescending(x => System.IO.File.GetCreationTime(x).Ticks).ToArray();
-                        break;
-                    case OrderType.NameDes:
-                        files = usorted_files.OrderByDescending(x => x).ToArray();
-                        break;
-                    case OrderType.Random:
-                        files = usorted_files.OrderByDescending(x => rand.Next()).ToArray();
-                        break;
-                    case OrderType.CreationTypeAsc:
-                        files = usorted_files.OrderBy(x => System.IO.File.GetCreationTime(x).Ticks).ToArray();
-                        break;
-                    case OrderType.NameAsc:
-                        files = usorted_files.OrderBy(x => x).ToArray();
-                        break;
-                }
+                var files = Directory.GetFiles(Path, "*", SearchOption).Where(x =>
+                    Extentions.Any(y => x.EndsWith(y, StringComparison.OrdinalIgnoreCase))).ToArray();
 
                 ImageInfo[] parallelRes = new ImageInfo[files.Length];
 
@@ -104,84 +102,109 @@ namespace MosaicGallery
                             parallelRes[i] = new ImageInfo(file,
                                 width > height ? Model.Orientation.Horizontal : Model.Orientation.Vertical);
                         }
-
+                        parallelRes[i].Metadata = file.EndsWith(".png") ? PngMetadataReader.ReadMetadata(file) : null;
                     }
                 });
 
-                images = new List<ImageInfo>(parallelRes);
+                _unplacedImages.AddRange(SortImages(parallelRes.ToList()));
+
                 return Task.CompletedTask;
             });
 
             return ImagePrepareTask;
         }
 
+        private List<ImageInfo> SortImages(List<ImageInfo> imgArray)
+        {
+            Random rand = new Random(Seed);
+            switch (OrderType)
+            {
+                case OrderType.CreationTypeDes:
+                    imgArray = imgArray.OrderByDescending(x => File.GetCreationTime(x.Filename).Ticks).ToList();
+                    break;
+                case OrderType.NameDes:
+                    imgArray = imgArray.OrderByDescending(x => x.Filename).ToList();
+                    break;
+                case OrderType.Random:
+                    imgArray = imgArray.OrderByDescending(x => rand.Next()).ToList();
+                    break;
+                case OrderType.CreationTypeAsc:
+                    imgArray = imgArray.OrderBy(x => File.GetCreationTime(x.Filename).Ticks).ToList();
+                    break;
+                case OrderType.NameAsc:
+                    imgArray = imgArray.OrderBy(x => x.Filename).ToList();
+                    break;
+            }
 
-        public async void LoadImages(ConcurrentBag<ImageUIInfo> imgPositions, Func<bool> continueLoadingPred, Func<bool> isScrolling, CancellationToken cancellationToken)
+            return imgArray;
+        }
+
+        private async void ResetDisplayedImages()
+        {
+            await _imagesSemaphore.WaitAsync();
+            hOffset = 0;
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                foreach (var imageUiInfo in _placedImages)
+                {
+                    imageUiInfo.Container.ResetImage(ContextMenu, ImageClickHandler);
+                    imageUiInfo.Container.Visibility = Visibility.Collapsed;
+                }
+            });
+
+
+            var sorted = SortImages(_unplacedImages.Concat(_placedImages).Concat(_ignoredImages).ToList());
+            var filterLookup = sorted.ToLookup(x => x.IsMatchFilter(Filter));
+            _unplacedImages.Clear();
+            _ignoredImages.Clear();
+            _placedImages.Clear();
+            _unplacedImages.AddRange(filterLookup[true]);
+            _ignoredImages.AddRange(filterLookup[false]);
+            GC.Collect();
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                scrollGrid.UpdateLayout();
+            });
+            _imagesSemaphore.Release();
+        }
+
+        public async void LoadImages(Func<bool> continueLoadingPred, Func<bool> isScrolling, CancellationToken cancellationToken)
         {
             Point scale = Scale;
             Random rand = new Random(Seed);
-            //foreach (var file in files)
-            //{
-            //    var bitmap = new BitmapImage();
 
-            //    bitmap.BeginInit();
-            //    bitmap.CreateOptions = BitmapCreateOptions.IgnoreColorProfile;
-            //    bitmap.StreamSource = File.OpenRead(file);
-            //    bitmap.EndInit();
-
-            //    images.Add(new ImageInfo(file, bitmap.Width > bitmap.Height ? Model.Orientation.Horizontal : Model.Orientation.Vertical));
-            //}
-
-            //Clearing
-            Application.Current.Dispatcher.Invoke(() =>
-            {
-                foreach (var item in imgPositions)
-                {
-                    if (item.Img.Source is BitmapImage img)
-                    {
-                        item.Img.Source = null;
-                        item.Img.UpdateLayout();
-                    }
-                }
-
-                scrollGrid.Children.Clear();
-                scrollGrid.UpdateLayout();
-            });
-
-            while (imgPositions.Any())
-            {
-                imgPositions.TryTake(out _);
-            }
-
-
-            GC.Collect();
-
-            double h = 0;
             while (true)
             {
-                if (!images.Any())
+                while (!_unplacedImages.Any() || continueLoadingPred())
                 {
                     await Task.Delay(100);
-                    return;
                 }
+
+                await _imagesSemaphore.WaitAsync();
+
                 List<ImageInfo> taken;
                 if (IsGrouping)
                 {
-                    taken = images.Take(rand.Next(ImgPerGroup.from, ImgPerGroup.to + 1)).ToList();
-                    images.RemoveRange(0, taken.Count);
+                    int toTakeCount = rand.Next(ImgPerGroup.from, ImgPerGroup.to + 1);
+                    taken = _unplacedImages.Take(toTakeCount).ToList();
+                    _unplacedImages.RemoveRange(0, taken.Count);
                 }
                 else
                 {
-                    taken = new List<ImageInfo>(images);
-                    images.Clear();
+                    taken = new List<ImageInfo>(_unplacedImages);
+                    _unplacedImages.Clear();
                 }
 
+                if (!taken.Any())
+                {
+                    continue;
+                }
 
                 var mosaic = new MosaicMatrix(SplitCount);
 
                 mosaic.FitImages(taken, rand, Sizes);
                 mosaic.FixLevels();
-                mosaic.FixLevelsWithImages(images);
+                mosaic.FixLevelsWithImages(_unplacedImages);
 
                 foreach (BlockInfo block in mosaic.blocks)
                 {
@@ -192,23 +215,17 @@ namespace MosaicGallery
                         if (block.Img is ImageUIInfo uiInfo)
                         {
                             container = uiInfo.Container;
+                            _placedImages.Add(uiInfo);
                         }
                         else
                         {
-
-                            string metadata = block.Img.Filename.EndsWith(".png") ? PngMetadataReader.ReadMetadata(block.Img.Filename) : null;
-
-                            var img = block.Img;
-                            // var margin = GetImageMargin(block.Pos, Scale, h);
-
-
                             var imgItem = new Image()
                             {
                                 Visibility = Visibility.Collapsed,
                                 Stretch = Stretch.UniformToFill,
                                 HorizontalAlignment = HorizontalAlignment.Center,
                                 VerticalAlignment = VerticalAlignment.Center,
-                                Tag = img.Filename
+                                Tag = block.Img.Filename
                             };
 
                             if (ImageClickHandler != null)
@@ -220,43 +237,34 @@ namespace MosaicGallery
                                 imgItem.ContextMenu = ContextMenu;
                             }
 
-                            container = new ImageContainer(imgItem, metadata);
+                            container = new ImageContainer(imgItem, block.Img.Metadata);
 
-                            imgPositions.Add(new ImageUIInfo(block.Img)
+                            _placedImages.Add(new ImageUIInfo(block.Img)
                             {
-                                Pos = (int)(block.Pos.Row + h),
+                                Pos = (int)(block.Pos.Row + hOffset),
                                 Container = container
                             });
 
                             scrollGrid.Children.Add(container);
                         }
 
-                        container.Margin = GetImageMargin(block.Pos, scale, h);
+                        container.Margin = GetImageMargin(block.Pos, scale, hOffset);
                         container.Width = block.Size.Width * scale.X;
                         container.Height = block.Size.Height * scale.Y;
+                        container.Visibility = Visibility.Visible;
                     });
 
-                    await Task.Delay(isScrolling() ? ImageLoadDelay * 4 : ImageLoadDelay);
+                    // await Task.Delay(isScrolling() ? ImageLoadDelay * 4 : ImageLoadDelay);
 
                     if (cancellationToken.IsCancellationRequested)
                     {
                         break;
                     }
                 }
+                hOffset += mosaic.matrix.Count + GroupSpace / 100.0;
 
-                if (images.Any())
-                {
-                    while (continueLoadingPred())
-                    {
-                        await Task.Delay(100);
-                        if (cancellationToken.IsCancellationRequested)
-                        {
-                            break;
-                        }
-                    }
-                }
+                _imagesSemaphore.Release();
 
-                h += mosaic.matrix.Count + GroupSpace / 100.0;
                 if (cancellationToken.IsCancellationRequested)
                 {
                     break;
@@ -268,43 +276,5 @@ namespace MosaicGallery
         {
             return new Thickness(pos.Col * scale.X, (pos.Row + h) * scale.Y, 0, 0);
         }
-
-
-        //public async void PlaceImages()
-        //{
-        //    Random rand = new Random(Seed);
-        //    var scale = Scale;
-
-        //    double h = 0;
-        //    while (images.Any())
-        //    {
-        //        List<ImageUIInfo> taken;
-        //        if (IsGrouping)
-        //        {
-        //            taken = images.Take(rand.Next(ImgPerGroup.from, ImgPerGroup.to + 1)).ToList();
-        //            images.RemoveRange(0, taken.Count);
-        //        }
-        //        else
-        //        {
-        //            taken = new List<ImageUIInfo>(images);
-        //            images.Clear();
-        //        }
-
-        //        var mosaic = new MosaicMatrix(SplitCount);
-
-        //        mosaic.FitImages(taken.Cast<ImageInfo>().ToList(), rand, Sizes);
-        //        mosaic.FixLevels();
-        //        mosaic.FixLevelsWithImages(images.Cast<ImageInfo>().ToList());
-
-        //        foreach (BlockInfo block in mosaic.blocks)
-        //        {
-        //            var info = (ImageUIInfo)block.Img;
-        //            info.Container.Margin = GetImageMargin(block.Pos, scale, h);
-        //            info.Container.Width = block.Size.Width * scale.X;
-        //            info.Container.Height = block.Size.Height * scale.Y;
-        //        }
-        //        h += mosaic.matrix.Count + GroupSpace / 100.0;
-        //    }
-        //}
     }
 }

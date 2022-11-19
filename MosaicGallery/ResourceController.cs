@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -23,15 +24,19 @@ namespace MosaicGallery
         private Grid scrollGrid;
 
         private List<WeakReference> weakReferences = new List<WeakReference>();
+        private readonly ConcurrentBag<ImageUIInfo> _placedImages;
+        private readonly SemaphoreSlim _imagesSemaphore;
 
-        public ResourceController(Grid scrollGrid)
+        public ResourceController(Grid scrollGrid, ConcurrentBag<ImageUIInfo> placedImages, SemaphoreSlim imagesSemaphore)
         {
             this.scrollGrid = scrollGrid;
+            this._placedImages = placedImages;
+            this._imagesSemaphore = imagesSemaphore;
         }
 
-        public void StartVisibilityControl(ConcurrentBag<ImageUIInfo> imgPositions, Func<double, bool> isVisiblePred, Func<bool> isScrolling)
+        public void StartVisibilityControl(Func<double, bool> isVisiblePred, Func<bool> isScrolling)
         {
-            weakReferences.AddRange(imgPositions.Select(x=>new WeakReference(x.Img)));
+            weakReferences.AddRange(_placedImages.Select(x=>new WeakReference(x.Img)));
 
             Task.Run(async () => {
 
@@ -42,10 +47,12 @@ namespace MosaicGallery
 
                     double scaleY = scrollGrid.RenderSize.Width / 6 / 1.4142857;
 
-                    var toUpdate = imgPositions.Where(x => x.Visible != isVisiblePred(x.Pos * scaleY)).ToArray();
+                    var toUpdate = _placedImages.Where(x => x.Visible != isVisiblePred(x.Pos * scaleY)).ToArray();
 
                     if (toUpdate.Any())
                     {
+                        await _imagesSemaphore.WaitAsync();
+
                         foreach (var item in toUpdate)
                         {
                             var img = item.Img;
@@ -59,15 +66,9 @@ namespace MosaicGallery
 
                             if (item.Visible && imageSource is BitmapImage bitmap && bitmap.StreamSource is Stream stream)
                             {
-                                stream.Close();
-                                stream.Dispose();
                                 Application.Current.Dispatcher.Invoke(() =>
                                 {
-                                    img.Source = null;
-                                    img.Visibility = Visibility.Collapsed;
-                                    img.CacheMode = new BitmapCache();
-                                    img.UpdateLayout();
-                                    item.Container.Image = CloneImage(item.Img);
+                                    item.Container.ResetImage(stream, ContextMenu, ImageClickHandler);
                                 });
                             }
                             else if (!item.Visible)
@@ -92,6 +93,8 @@ namespace MosaicGallery
                             }
                             await Task.Delay(isScrolling() ? ImageLoadDelay * 4 : ImageLoadDelay);
                         }
+
+                        _imagesSemaphore.Release();
                     }
 
                     if (CG_CallTime < DateTime.Now.Ticks)
@@ -106,22 +109,6 @@ namespace MosaicGallery
                     await Task.Delay(isScrolling() ? ImageLoadDelay * 4 : ImageLoadDelay);
                 }
             });
-
-        }
-
-        private Image CloneImage(Image itemImg)
-        {
-            var image = new Image() { 
-                Tag = itemImg.Tag,
-                Margin = itemImg.Margin,
-                Width = itemImg.Width, 
-                Height = itemImg.Height,
-                Visibility = itemImg.Visibility,
-            };
-
-            image.ContextMenu = ContextMenu;
-            image.PreviewMouseLeftButtonDown += ImageClickHandler;
-            return image;
         }
     }
 }

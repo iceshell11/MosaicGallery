@@ -15,6 +15,7 @@ namespace MosaicGallery.Model
 
         public ImageUIInfo(ImageInfo imageInfo) : base(imageInfo.Filename, imageInfo.Orientation)
         {
+            Metadata = imageInfo.Metadata;
         }
 
         public Image Img => Container.Image;
