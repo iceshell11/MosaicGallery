@@ -1,4 +1,5 @@
 ﻿using MosaicGallery.Model;
+using Ookii.Dialogs.Wpf;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -239,13 +240,11 @@ namespace MosaicGallery
 
         private void open_btn_Click(object sender, RoutedEventArgs e)
         {
-            //using (var dialog = new System.Windows.Forms.FolderBrowserDialog())
-            //{
-            //    if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
-            //    {
-            //        path_textbox.Text = dialog.SelectedPath;
-            //    }
-            //}
+            var dialog = new VistaFolderBrowserDialog();
+            if (dialog.ShowDialog() == true)
+            {
+                path_textbox.Text = dialog.SelectedPath;
+            }
         }
 
         private void OpenMenu_Click(object sender, RoutedEventArgs e)
