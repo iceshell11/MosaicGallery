@@ -10,13 +10,13 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
 namespace MosaicGallery
 {
     public class ResourceController
     {
+        public int VisibilityDistance = 3000;
         public int ImageLoadDelay;
         public MouseButtonEventHandler ImageClickHandler;
         public ContextMenu ContextMenu;
@@ -34,7 +34,7 @@ namespace MosaicGallery
             this._imagesSemaphore = imagesSemaphore;
         }
 
-        public void StartVisibilityControl(Func<double, bool> isVisiblePred, Func<bool> isScrolling)
+        public void StartVisibilityControl(Func<double> scrollContentOffsetSupplier, Func<bool> isScrolling)
         {
             weakReferences.AddRange(_placedImages.Select(x=>new WeakReference(x.Img)));
 
@@ -47,7 +47,7 @@ namespace MosaicGallery
 
                     double scaleY = scrollGrid.RenderSize.Width / 6 / 1.4142857;
 
-                    var toUpdate = _placedImages.Where(x => x.Visible != isVisiblePred(x.Pos * scaleY)).ToArray();
+                    var toUpdate = _placedImages.Where(x => x.Visible != Math.Abs(x.Pos * scaleY - scrollContentOffsetSupplier()) < VisibilityDistance).ToArray();
 
                     if (toUpdate.Any())
                     {

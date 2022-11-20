@@ -23,24 +23,23 @@ namespace MosaicGallery
         private double scrollRemain = 0;
         private double scrollContentOffset = 0;
         private long lastScrollTime = 0;
-
-        private double visabilityDistance = 3000;
-
-        private int imageLoadDelay = 15;
-
-
-        private Point scrollMousePoint = new Point();
         private double hOff = 1;
+        private Point scrollMousePoint = new Point();
+        private string _searchText = "";
+
+
+        private int imageLoadDelay = 0;
         private CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
 
         private readonly ConcurrentBag<ImageUIInfo> _placedImages = new ConcurrentBag<ImageUIInfo>();
         private readonly SelectionProcessor _selectionProcessor = new SelectionProcessor();
         private readonly FileProcessor _fileProcessor = new FileProcessor();
-        private ImagePlacer _imPlacer;
+        private readonly ImagePlacer _imPlacer;
+        private readonly ResourceController _resourceController;
 
-        private MouseButtonEventHandler _imageClickHandler;
-        private ContextMenu _contextMenu;
-        private string _searchText = "";
+        private readonly MouseButtonEventHandler _imageClickHandler;
+        private readonly ContextMenu _contextMenu;
+
         private readonly SemaphoreSlim _imagesSemaphore = new SemaphoreSlim(1, 1);
 
         public MainWindow()
@@ -48,25 +47,6 @@ namespace MosaicGallery
             InitializeComponent();
             _imPlacer = new ImagePlacer(scrollGrid, _placedImages, _imagesSemaphore);
 
-            int pathIndex = Array.IndexOf(Environment.GetCommandLineArgs(), "--path");
-
-            if (pathIndex != -1)
-            {
-                var arg1 = Environment.GetCommandLineArgs()[pathIndex + 1];
-                if (Directory.Exists(arg1))
-                {
-                    path_textbox.Text = arg1;
-                }
-            }
-
-            if (Array.IndexOf(Environment.GetCommandLineArgs(), "--no-dialog") != -1)
-            {
-                Task.Delay(10).ContinueWith(x => Application.Current.Dispatcher.Invoke(Start));
-            }
-        }
-
-        private void Window_Loaded(object sender, RoutedEventArgs e)
-        {
             _imageClickHandler = (sender1, e1) =>
             {
                 if (Keyboard.IsKeyDown(Key.LeftShift))
@@ -90,12 +70,34 @@ namespace MosaicGallery
             seed_num.Text = new Random().Next(99999).ToString();
             path_textbox.Focus();
 
-            var resourceController = new ResourceController(scrollGrid, _placedImages, _imagesSemaphore)
+            _resourceController = new ResourceController(scrollGrid, _placedImages, _imagesSemaphore)
             {
                 ContextMenu = _contextMenu,
-                ImageClickHandler = _imageClickHandler
+                ImageClickHandler = _imageClickHandler,
+                ImageLoadDelay = imageLoadDelay
             };
-            resourceController.StartVisibilityControl((double pos) => Math.Abs(pos - scrollContentOffset) < visabilityDistance, () => DateTime.Now.Ticks - lastScrollTime < 1000 * TimeSpan.TicksPerMillisecond);
+
+
+            int pathIndex = Array.IndexOf(Environment.GetCommandLineArgs(), "--path");
+
+            if (pathIndex != -1)
+            {
+                var arg1 = Environment.GetCommandLineArgs()[pathIndex + 1];
+                if (Directory.Exists(arg1))
+                {
+                    path_textbox.Text = arg1;
+                }
+            }
+
+            if (Array.IndexOf(Environment.GetCommandLineArgs(), "--no-dialog") != -1)
+            {
+                Task.Delay(10).ContinueWith(x => Application.Current.Dispatcher.Invoke(Start));
+            }
+        }
+
+        private void Window_Loaded(object sender, RoutedEventArgs e)
+        {
+            _resourceController.StartVisibilityControl(() => scrollContentOffset, () => DateTime.Now.Ticks - lastScrollTime < 1000 * TimeSpan.TicksPerMillisecond);
 
             Task.Run(async () =>
             {
@@ -113,82 +115,6 @@ namespace MosaicGallery
                     }
                 }
             });
-        }
-
-        private ContextMenu CreateContextMenu()
-        {
-            var contextMenu = new ContextMenu();
-
-            var reopen_item = new MenuItem() { Header = "Select folder..." };
-            reopen_item.Click += OpenMenu_Click;
-            contextMenu.Items.Add(reopen_item);
-
-            var open_file = new MenuItem() { Header = "Open file" };
-            open_file.Click += (s1, e1) =>
-            {
-                // _cancellationTokenSource.Cancel();
-                // _cancellationTokenSource = new CancellationTokenSource();
-                // imPlacer.PlaceImages(_placedImages, new Random());
-                var image = ((s1 as MenuItem).Parent as ContextMenu).PlacementTarget as Image;
-                var imgPath = image.Tag.ToString();
-                Process.Start(imgPath);
-            };
-            contextMenu.Items.Add(open_file);
-
-            var reveal_menu = new MenuItem() { Header = "Reveal in explorer" };
-            reveal_menu.Click += (s1, e1) =>
-            {
-                var image = ((s1 as MenuItem).Parent as ContextMenu).PlacementTarget as Image;
-                var imgPath = image.Tag.ToString();
-                string argument = "/select, \"" + imgPath + "\"";
-                System.Diagnostics.Process.Start("explorer.exe", argument);
-            };
-            contextMenu.Items.Add(reveal_menu);
-
-
-            var delete_menu = new MenuItem() { Header = "Delete" };
-            delete_menu.Click += (s1, e1) =>
-            {
-                var image = ((s1 as MenuItem).Parent as ContextMenu).PlacementTarget as Image;
-
-                if (_selectionProcessor.Contains(image.Parent as Border))
-                {
-                    _fileProcessor.DeleteImages(_selectionProcessor.SelectedImages);
-                }
-                else
-                {
-                    _fileProcessor.DeleteImages(image);
-                }
-            };
-            contextMenu.Items.Add(delete_menu);
-            return contextMenu;
-        }
-
-        private void scrollGrid_SizeChanged(object sender, SizeChangedEventArgs e)
-        {
-            if (e.WidthChanged && e.PreviousSize.Width != 0)
-            {
-                var d = e.NewSize.Width / e.PreviousSize.Width;
-
-                foreach (var item in scrollGrid.Children.OfType<Border>())
-                {
-                    item.Margin = new Thickness(item.Margin.Left * d, item.Margin.Top * d, 0, 0);
-                    item.Width *= d;
-                    item.Height *= d;
-                }
-            }
-        }
-
-        private void scrollViewer_ScrollChanged(object sender, ScrollChangedEventArgs e)
-        {
-            scrollRemain = (e.ExtentHeight - e.VerticalOffset);
-            scrollContentOffset = scrollViewer.ContentVerticalOffset;
-            lastScrollTime = DateTime.Now.Ticks;
-        }
-
-        private void ok_button_Click_1(object sender, RoutedEventArgs e)
-        {
-            Start();
         }
 
         private void Start()
@@ -248,6 +174,88 @@ namespace MosaicGallery
             });
             scrollViewer.ScrollToVerticalOffset(0);
             load_grid.Visibility = Visibility.Collapsed;
+        }
+
+        private ContextMenu CreateContextMenu()
+        {
+            var contextMenu = new ContextMenu();
+
+            var reopen_item = new MenuItem() { Header = "Select folder..." };
+            reopen_item.Click += OpenMenu_Click;
+            contextMenu.Items.Add(reopen_item);
+
+            var open_file = new MenuItem() { Header = "Open file" };
+            open_file.Click += (s1, e1) =>
+            {
+                var image = ((s1 as MenuItem).Parent as ContextMenu).PlacementTarget as Image;
+                var imgPath = image.Tag.ToString();
+
+                ProcessStartInfo procStartInfo = new ProcessStartInfo("cmd", $"/c {imgPath}")
+                {
+                    RedirectStandardError = true,
+                    RedirectStandardOutput = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+
+                Process.Start(procStartInfo);
+            };
+            contextMenu.Items.Add(open_file);
+
+            var reveal_menu = new MenuItem() { Header = "Reveal in explorer" };
+            reveal_menu.Click += (s1, e1) =>
+            {
+                var image = ((s1 as MenuItem)!.Parent as ContextMenu)!.PlacementTarget as Image;
+                var imgPath = image!.Tag.ToString();
+                string argument = "/select, \"" + imgPath + "\"";
+                Process.Start("explorer.exe", argument);
+            };
+            contextMenu.Items.Add(reveal_menu);
+
+
+            var delete_menu = new MenuItem() { Header = "Delete" };
+            delete_menu.Click += (s1, e1) =>
+            {
+                var image = (Image)((ContextMenu)((MenuItem)s1).Parent)!.PlacementTarget;
+
+                if (_selectionProcessor.Contains((Border)image.Parent))
+                {
+                    _fileProcessor.DeleteImages(_selectionProcessor.SelectedImages);
+                }
+                else
+                {
+                    _fileProcessor.DeleteImages(image);
+                }
+            };
+            contextMenu.Items.Add(delete_menu);
+            return contextMenu;
+        }
+
+        private void scrollGrid_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            if (e.WidthChanged && e.PreviousSize.Width != 0)
+            {
+                var d = e.NewSize.Width / e.PreviousSize.Width;
+
+                foreach (var item in scrollGrid.Children.OfType<Border>())
+                {
+                    item.Margin = new Thickness(item.Margin.Left * d, item.Margin.Top * d, 0, 0);
+                    item.Width *= d;
+                    item.Height *= d;
+                }
+            }
+        }
+
+        private void scrollViewer_ScrollChanged(object sender, ScrollChangedEventArgs e)
+        {
+            scrollRemain = (e.ExtentHeight - e.VerticalOffset);
+            scrollContentOffset = scrollViewer.ContentVerticalOffset;
+            lastScrollTime = DateTime.Now.Ticks;
+        }
+
+        private void ok_button_Click_1(object sender, RoutedEventArgs e)
+        {
+            Start();
         }
 
         private void open_btn_Click(object sender, RoutedEventArgs e)

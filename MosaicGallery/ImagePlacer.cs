@@ -253,7 +253,7 @@ namespace MosaicGallery
                         container.Visibility = Visibility.Visible;
                     });
 
-                    // await Task.Delay(isScrolling() ? ImageLoadDelay * 4 : ImageLoadDelay);
+                    await Task.Delay(isScrolling() ? ImageLoadDelay * 4 : ImageLoadDelay);
 
                     if (cancellationToken.IsCancellationRequested)
                     {
