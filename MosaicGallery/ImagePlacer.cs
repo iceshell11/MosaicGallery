@@ -11,8 +11,6 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using MosaicGallery.Model;
 using System.Windows.Input;
-using System.Windows.Shapes;
-using System.Windows.Documents;
 
 namespace MosaicGallery
 {
@@ -215,6 +213,7 @@ namespace MosaicGallery
                         if (block.Img is ImageUIInfo uiInfo)
                         {
                             container = uiInfo.Container;
+                            uiInfo.Pos = (int)(block.Pos.Row + hOffset);
                             _placedImages.Add(uiInfo);
                         }
                         else

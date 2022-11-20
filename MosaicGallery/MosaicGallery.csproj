@@ -5,6 +5,8 @@
     <TargetFramework>net6.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
     <UseWPF>true</UseWPF>
+    <ApplicationIcon>gallery.ico</ApplicationIcon>
+    <PackageIcon>gallery.ico</PackageIcon>
   </PropertyGroup>
 
   <ItemGroup>
@@ -12,6 +14,10 @@
     <None Remove="Resources\comment.png" />
     <None Remove="Resources\cross2.png" />
     <None Remove="Resources\exclamation.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="gallery.ico" />
   </ItemGroup>
 
   <ItemGroup>
@@ -24,6 +30,13 @@
     <Resource Include="Resources\comment.png" />
     <Resource Include="Resources\cross2.png" />
     <Resource Include="Resources\exclamation.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="gallery.ico">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
   </ItemGroup>
 
 </Project>
