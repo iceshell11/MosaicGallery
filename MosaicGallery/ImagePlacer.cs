@@ -18,7 +18,10 @@ namespace MosaicGallery
     {
         public string Path;
         public string[] Extentions = new string[] { ".jpeg", ".jpg", ".png", ".bmp" };
-        private Point Scale => new Point(scrollGrid.RenderSize.Width / SplitCount, scrollGrid.RenderSize.Width / SplitCount / 1.4142857);
+        public int SplitCount = 6;
+        public (int from, int to) ImgPerGroup = (6, 12);
+        public int ImageLoadDelay = 0;
+        public Point Scale => new Point(_scrollGrid.RenderSize.Width / SplitCount, _scrollGrid.RenderSize.Width / SplitCount / 1.4142857);
 
         public SearchOption SearchOption;
         public int Seed;
@@ -28,13 +31,6 @@ namespace MosaicGallery
         public int SmallCount;
         public int MediumCount;
         public int LargeCount;
-
-        public (int from, int to) ImgPerGroup = (6, 12);
-        public int SplitCount = 6;
-        public int ImageLoadDelay;
-
-
-        private Grid scrollGrid;
 
         public MouseButtonEventHandler ImageClickHandler;
         public ContextMenu ContextMenu;
@@ -46,11 +42,14 @@ namespace MosaicGallery
 
         private readonly List<ImageInfo> _unplacedImages = new List<ImageInfo>();
         private readonly List<ImageInfo> _ignoredImages = new List<ImageInfo>();
+
+        private readonly Grid _scrollGrid;
         private readonly ConcurrentBag<ImageUIInfo> _placedImages;
         private readonly SemaphoreSlim _imagesSemaphore;
+
         public ImagePlacer(Grid scrollGrid, ConcurrentBag<ImageUIInfo> placedImages, SemaphoreSlim imagesSemaphore)
         {
-            this.scrollGrid = scrollGrid;
+            this._scrollGrid = scrollGrid;
             this._placedImages = placedImages;
             this._imagesSemaphore = imagesSemaphore;
         }
@@ -64,7 +63,6 @@ namespace MosaicGallery
                 ResetDisplayedImages();
             }
         }
-
 
         (int size, int weight)[] Sizes => new (int size, int weight)[]
         {
@@ -161,7 +159,7 @@ namespace MosaicGallery
             GC.Collect();
             Application.Current.Dispatcher.Invoke(() =>
             {
-                scrollGrid.UpdateLayout();
+                _scrollGrid.UpdateLayout();
             });
             _imagesSemaphore.Release();
         }
@@ -170,6 +168,7 @@ namespace MosaicGallery
         {
             Point scale = Scale;
             Random rand = new Random(Seed);
+            // bool needUpdateLayout = false;
 
             while (true)
             {
@@ -244,7 +243,9 @@ namespace MosaicGallery
                                 Container = container
                             });
 
-                            scrollGrid.Children.Add(container);
+                            _scrollGrid.Children.Add(container);
+
+                            // needUpdateLayout = true;
                         }
 
                         container.Margin = GetImageMargin(block.Pos, scale, hOffset);
@@ -263,6 +264,23 @@ namespace MosaicGallery
                 hOffset += mosaic.matrix.Count + GroupSpace / 100.0;
 
                 _imagesSemaphore.Release();
+
+                //if (needUpdateLayout)
+                //{
+                //    needUpdateLayout = false;
+                //    Application.Current.Dispatcher.Invoke(() =>
+                //    {
+                //        _scrollGrid.UpdateLayout();
+                //    });
+                //    await Task.Delay(100);
+                //    Application.Current.Dispatcher.Invoke(() =>
+                //    {
+                //        foreach (var imageUiInfo in _placedImages.Where(x=>x.Metadata != null))
+                //        {
+                //            imageUiInfo.Container.AdjustMetadataIcon();
+                //        }
+                //    });
+                //}
 
                 if (cancellationToken.IsCancellationRequested)
                 {

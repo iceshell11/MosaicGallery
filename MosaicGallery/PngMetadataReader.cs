@@ -18,7 +18,7 @@ namespace MosaicGallery
                 fs.Read(header, 0, 8);
                 if (!header.SequenceEqual(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 }))
                 {
-                    throw new InvalidOperationException("not a png file");
+                    return null;
                 }
 
                 using (var br = new BinaryReader(fs, Encoding.ASCII, true))

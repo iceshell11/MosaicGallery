@@ -53,7 +53,7 @@ namespace MosaicGallery
                     {
                         await _imagesSemaphore.WaitAsync();
 
-                        foreach (var item in toUpdate)
+                        foreach (var item in toUpdate.OrderBy(x=> Math.Abs(x.Pos * scaleY - scrollContentOffsetSupplier())))
                         {
                             var img = item.Img;
                             string path = "";

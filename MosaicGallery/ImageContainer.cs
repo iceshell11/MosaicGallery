@@ -1,10 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Drawing;
 using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -18,6 +13,7 @@ namespace MosaicGallery
     {
         private readonly Grid _grid = new Grid();
         private Image _image;
+        private Image? _metaIcon;
         public ImageContainer(Image imgItem, string? metadata)
         {
             this._image = imgItem;
@@ -28,9 +24,10 @@ namespace MosaicGallery
             Tag = "Image";
 
             _grid.Children.Add(imgItem);
+
             if (metadata != null)
             {
-                var image = new Image()
+                _metaIcon = new Image()
                 {
                     Width = 20,
                     Height = 20,
@@ -43,16 +40,17 @@ namespace MosaicGallery
                     ToolTip = new ToolTip()
                     {
                         Content = metadata
-                    }
+                    },
+                    Tag = metadata
                 };
-                image.PreviewMouseLeftButtonDown += (sender, args) =>
+                _metaIcon.PreviewMouseLeftButtonDown += (sender, args) =>
                 {
                     if (args.ClickCount == 2)
                     {
                         Clipboard.SetText(metadata);
                     }
                 };
-                _grid.Children.Add(image);
+                _grid.Children.Add(_metaIcon);
             }
         }
 
@@ -102,6 +100,12 @@ namespace MosaicGallery
             image.ContextMenu = contextMenu;
             image.PreviewMouseLeftButtonDown += imageClickHandler;
             return image;
+        }
+
+        public void AdjustMetadataIcon()
+        {
+            Point relativePoint = _image.TransformToAncestor(_grid).Transform(new Point(0, 0));
+            _metaIcon.Margin = new Thickness(20, relativePoint.Y + 20, 20, 20);
         }
     }
 }

@@ -111,7 +111,7 @@ namespace MosaicGallery
                         {
                             scrollViewer.ScrollToVerticalOffset(0);
                         });
-                        await Task.Delay(3000);
+                        await Task.Delay(1000);
                     }
                 }
             });
