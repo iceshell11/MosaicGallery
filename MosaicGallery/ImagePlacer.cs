@@ -21,7 +21,6 @@ namespace MosaicGallery
         public int SplitCount = 6;
         public (int from, int to) ImgPerGroup = (6, 12);
         public int ImageLoadDelay = 0;
-        public Point Scale => new Point(_scrollGrid.RenderSize.Width / SplitCount, _scrollGrid.RenderSize.Width / SplitCount / 1.4142857);
 
         public SearchOption SearchOption;
         public int Seed;
@@ -70,6 +69,8 @@ namespace MosaicGallery
             (2, MediumCount),
             (3, LargeCount),
         };
+
+        public Point CalculateScale() => new Point(_scrollGrid.RenderSize.Width / SplitCount, _scrollGrid.RenderSize.Width / SplitCount / 1.4142857);
 
 
         public Task PrepareImages()
@@ -166,9 +167,7 @@ namespace MosaicGallery
 
         public async void LoadImages(Func<bool> continueLoadingPred, Func<bool> isScrolling, CancellationToken cancellationToken)
         {
-            Point scale = Scale;
             Random rand = new Random(Seed);
-            // bool needUpdateLayout = false;
 
             while (true)
             {
@@ -244,10 +243,9 @@ namespace MosaicGallery
                             });
 
                             _scrollGrid.Children.Add(container);
-
-                            // needUpdateLayout = true;
                         }
 
+                        Point scale = CalculateScale();
                         container.Margin = GetImageMargin(block.Pos, scale, hOffset);
                         container.Width = block.Size.Width * scale.X;
                         container.Height = block.Size.Height * scale.Y;
@@ -264,23 +262,6 @@ namespace MosaicGallery
                 hOffset += mosaic.matrix.Count + GroupSpace / 100.0;
 
                 _imagesSemaphore.Release();
-
-                //if (needUpdateLayout)
-                //{
-                //    needUpdateLayout = false;
-                //    Application.Current.Dispatcher.Invoke(() =>
-                //    {
-                //        _scrollGrid.UpdateLayout();
-                //    });
-                //    await Task.Delay(100);
-                //    Application.Current.Dispatcher.Invoke(() =>
-                //    {
-                //        foreach (var imageUiInfo in _placedImages.Where(x=>x.Metadata != null))
-                //        {
-                //            imageUiInfo.Container.AdjustMetadataIcon();
-                //        }
-                //    });
-                //}
 
                 if (cancellationToken.IsCancellationRequested)
                 {
