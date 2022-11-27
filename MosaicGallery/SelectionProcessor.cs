@@ -10,16 +10,16 @@ namespace MosaicGallery
 {
     public class SelectionProcessor
     {
-        private List<Border> containers = new List<Border>();
-        public Image[] SelectedImages => containers.Select(x => (Image)x.Child).ToArray();
+        private List<ImageContainer> containers = new List<ImageContainer>();
+        public ImageContainer[] SelectedImages => containers.ToArray();
 
-        public void Select(Border obj)
+        public void Select(ImageContainer obj)
         {
             obj.BorderBrush = new SolidColorBrush(Colors.Fuchsia);
             containers.Add(obj);
         }
 
-        public void Deselect(Border obj)
+        public void Deselect(ImageContainer obj)
         {
             obj.BorderBrush = null;
             containers.Remove(obj);
@@ -35,7 +35,7 @@ namespace MosaicGallery
             containers.Clear();
         }
 
-        public void ToggleSelection(Border obj)
+        public void ToggleSelection(ImageContainer obj)
         {
             if (containers.Contains(obj))
             {

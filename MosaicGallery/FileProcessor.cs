@@ -5,22 +5,22 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Controls;
 using System.Windows.Media.Imaging;
 
 namespace MosaicGallery
 {
     public class FileProcessor
     {
-        public void DeleteImages(params Image[] images)
+        public void DeleteImages(params ImageContainer[] containers)
         {
-            foreach (var image in images)
+            if (MessageBox.Show("Are you sure?", $"Deleting {containers.Length} files", MessageBoxButton.YesNo,
+                    MessageBoxImage.Question) == MessageBoxResult.Yes)
             {
-                if (MessageBox.Show("Are you sure?", $"Deleting {images.Length} files", MessageBoxButton.YesNo, 
-                        MessageBoxImage.Question) == MessageBoxResult.Yes)
+                foreach (var container in containers)
                 {
+                    var image = container.Image;
                     var path = image.Tag.ToString();
-                    BitmapImage source = image.Source as BitmapImage;
+                    BitmapImage source = (image.Source as BitmapImage)!;
                     var sourceStreamSource = source.StreamSource;
                     if (sourceStreamSource.CanRead)
                     {
@@ -28,6 +28,7 @@ namespace MosaicGallery
                     }
                     image.Source = null;
                     File.Delete(path);
+                    container.Visibility = Visibility.Hidden;
                 }
             }
         }

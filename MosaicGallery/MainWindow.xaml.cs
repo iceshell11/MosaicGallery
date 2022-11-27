@@ -79,6 +79,14 @@ namespace MosaicGallery
 
 
             int pathIndex = Array.IndexOf(Environment.GetCommandLineArgs(), "--path");
+            if (pathIndex == -1 && Environment.GetCommandLineArgs().Length > 1)
+            {
+                var path = Environment.GetCommandLineArgs()[1];
+                if (Directory.Exists(path))
+                {
+                    pathIndex = 0;
+                }
+            }
 
             if (pathIndex != -1)
             {
@@ -217,15 +225,17 @@ namespace MosaicGallery
             delete_menu.Click += (s1, e1) =>
             {
                 var image = (Image)((ContextMenu)((MenuItem)s1).Parent)!.PlacementTarget;
+                var imageContainer = image.FindParent<ImageContainer>();
 
-                if (_selectionProcessor.Contains((Border)image.Parent))
+                if (_selectionProcessor.Contains(imageContainer))
                 {
                     _fileProcessor.DeleteImages(_selectionProcessor.SelectedImages);
                 }
                 else
                 {
-                    _fileProcessor.DeleteImages(image);
+                    _fileProcessor.DeleteImages(imageContainer);
                 }
+                _selectionProcessor.ResetSelection();
             };
             contextMenu.Items.Add(delete_menu);
             return contextMenu;
