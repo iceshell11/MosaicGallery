@@ -8,11 +8,3 @@ The program serves for convenient representation of a large number of images.
 * Viewing AUTOMATIC1111's sd-webui data of AI-generated images (double-click the icon in the upper right corner to copy the data to the clipboard)
 * Filtering by name and sd-webui data (Ctrl+F)
 * Deleting images (hold shift to select images)
-
-## Example
-
-![Basic view](./example/1.png)
-
-![Fullscreen view](./example/2.png)
-
-![sd-webui data](./example/3.png)
